@@ -213,6 +213,7 @@ public class HBaseFsck extends Configured implements Tool {
    * This map contains the state of all hbck items.  It maps from encoded region
    * name to HbckInfo structure.  The information contained in HbckInfo is used
    * to detect and correct consistency (hdfs/meta/deployment) problems.
+   * TODO:这个encodeName不是hash么？也能用字典序排序？？
    */
   private TreeMap<String, HbckInfo> regionInfoMap = new TreeMap<String, HbckInfo>();
   private TreeSet<byte[]> disabledTables =
@@ -769,6 +770,7 @@ public class HBaseFsck extends Configured implements Tool {
     }
 
     // serialized table info gathering.
+    //所有的region信息中得到表信息
     for (HbckInfo hbi: hbckInfos) {
 
       if (hbi.getHdfsHRI() == null) {
@@ -807,6 +809,7 @@ public class HBaseFsck extends Configured implements Tool {
           }
         }
       }
+      //将region信息放入表信息中
       if (!hbi.isSkipChecks()) {
         modTInfo.addRegionInfo(hbi);
       }
@@ -1922,7 +1925,10 @@ public class HBaseFsck extends Configured implements Tool {
       }
       return null;
     }
-
+    /**
+     * 表信息中添加HbckInfo信息肯定是有序的，因为所有的HbckInfo就是按region名来排的序
+     * @param hir
+     */
     public void addRegionInfo(HbckInfo hir) {
       if (Bytes.equals(hir.getEndKey(), HConstants.EMPTY_END_ROW)) {
         // end key is absolute end key, just add it.
@@ -2250,6 +2256,7 @@ public class HBaseFsck extends Configured implements Tool {
     }
 
     /**
+     *针对每一个进行region检查
      * Check the region chain (from META) of this table.  We are looking for
      * holes, overlaps, and cycles.
      * @return false if there are errors
@@ -2263,11 +2270,14 @@ public class HBaseFsck extends Configured implements Tool {
         return true;
       }
       int originalErrorsCount = errors.getErrorList().size();
+      //理论上每一个rowkey，只应该有一个region，如果有多个就是重叠
       Multimap<byte[], HbckInfo> regions = sc.calcCoverage();
+      //它只有region的起始与结束rowkey
       SortedSet<byte[]> splits = sc.getSplits();
 
       byte[] prevKey = null;
       byte[] problemKey = null;
+      
       for (byte[] key : splits) {
         Collection<HbckInfo> ranges = regions.get(key);
         if (prevKey == null && !Bytes.equals(key, HConstants.EMPTY_BYTE_ARRAY)) {

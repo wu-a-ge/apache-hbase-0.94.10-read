@@ -1606,11 +1606,14 @@ public class Store extends SchemaConfigured implements HeapSize {
     int countOfFiles = compactSelection.getFilesToCompact().size();
     long [] fileSizes = new long[countOfFiles];
     long [] sumSize = new long[countOfFiles];
+    //旧的在列表的前面,也即i=0肯定最旧的StoreFile
     for (int i = countOfFiles-1; i >= 0; --i) {
       StoreFile file = compactSelection.getFilesToCompact().get(i);
       fileSizes[i] = file.getReader().length();
       // calculate the sum of fileSizes[i,i+maxFilesToCompact-1) for algo
       int tooFar = i + this.maxFilesToCompact - 1;
+      //最新的文件sumSize[i]等于fileSizes[i]，次新的文件sumSize[i]=fileSizes[i]+sumSize[i+1]
+      //最旧的文件就等于前面的所有新文件的和。越旧的文件fileSizes本身就可能很大，它可能经过多次合并
       sumSize[i] = fileSizes[i]
           + ((i+1    < countOfFiles) ? sumSize[i+1]      : 0)
           - ((tooFar < countOfFiles) ? fileSizes[tooFar] : 0);
