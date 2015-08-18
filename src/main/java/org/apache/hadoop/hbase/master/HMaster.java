@@ -1068,6 +1068,7 @@ Server {
       serverStartCode, serverCurrentTime);
     // Send back some config info
     MapWritable mw = createConfigurationSubset();
+    //这里得到 的主机名可能是IP，也有可能是域名，所以叫master看到regionserer的主机名是什么
     mw.put(new Text(HConstants.KEY_FOR_HOSTNAME_SEEN_BY_MASTER),
       new Text(rs.getHostname()));
     return mw;

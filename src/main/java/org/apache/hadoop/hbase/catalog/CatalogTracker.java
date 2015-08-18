@@ -191,6 +191,8 @@ public class CatalogTracker {
     this.rootRegionTracker = new RootRegionTracker(zookeeper, throwableAborter);
     final CatalogTracker ct = this;
     // Override nodeDeleted so we get notified when meta node deleted
+    //这个跟踪的目的是，当unassigned下的meta region节点被删除表示，元数据已经准备好了，我可以同步元数据了
+    //所有未上线的region都在unassigned下面的
     this.metaNodeTracker = new MetaNodeTracker(zookeeper, throwableAborter) {
       public void nodeDeleted(String path) {
         if (!path.equals(node)) return;

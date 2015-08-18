@@ -644,12 +644,14 @@ public class HRegionServer implements HRegionInterface, HBaseRPCErrorHandler,
     // Create the master address manager, register with zk, and start it.  Then
     // block until a master is available.  No point in starting up if no master
     // running.
+    //如果master没有启动，一直在这个地方阻塞
     this.masterAddressManager = new MasterAddressTracker(this.zooKeeper, this);
     this.masterAddressManager.start();
     blockAndCheckIfStopped(this.masterAddressManager);
 
     // Wait on cluster being up.  Master will set this flag up in zookeeper
     // when ready.
+    //如果集群没有准备好(zk中是否有shutdown节点和数据)一直在这个地方阻塞
     this.clusterStatusTracker = new ClusterStatusTracker(this.zooKeeper, this);
     this.clusterStatusTracker.start();
     blockAndCheckIfStopped(this.clusterStatusTracker);
@@ -691,6 +693,8 @@ public class HRegionServer implements HRegionInterface, HBaseRPCErrorHandler,
 
   private void initializeThreads() throws IOException {
     // Cache flushing thread.
+	  //定时检测当前机器上的所有memstore容量达到是否最低限制。如果达到去刷新，所有需要刷新内存的操作都会通知这个线程
+	  //它内部使用了一个队列
     this.cacheFlusher = new MemStoreFlusher(conf, this);
 
     // Compaction thread
@@ -702,7 +706,7 @@ public class HRegionServer implements HRegionInterface, HBaseRPCErrorHandler,
       ".multiplier", 1000);
     this.compactionChecker = new CompactionChecker(this,
       this.threadWakeFrequency * multiplier, this);
-
+    //定时检测，是否有在线region的需要刷新内存，如果有通知MemStoreFlusher
     this.periodicFlusher = new PeriodicMemstoreFlusher(this.threadWakeFrequency, this);
 
     // Health checker thread.
@@ -1047,7 +1051,7 @@ public class HRegionServer implements HRegionInterface, HBaseRPCErrorHandler,
     }
   }
 
-  /*
+  /**
    * Run init. Sets up hlog and starts up all server threads.
    *
    * @param c Extra configuration.
