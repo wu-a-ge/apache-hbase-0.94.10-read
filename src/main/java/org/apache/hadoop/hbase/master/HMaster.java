@@ -412,6 +412,7 @@ Server {
        * now wait until it dies to try and become the next active master.  If we
        * do not succeed on our first attempt, this is no longer a cluster startup.
        */
+      //和其它master机器竞争成为active节点，如果成功创建一个临时节点在ZK上，
       becomeActiveMaster(startupStatus);
 
       // We are either the active master or we were asked to shutdown
@@ -503,6 +504,7 @@ Server {
 
     // Set the cluster as up.  If new RSs, they'll be waiting on this before
     // going ahead with their startup.
+    //会在zk的shutdown中写入当前master启动时间
     boolean wasUp = this.clusterStatusTracker.isClusterUp();
     if (!wasUp) this.clusterStatusTracker.setClusterUp();
 

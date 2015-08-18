@@ -641,6 +641,7 @@ public class ServerManager {
     long lastCountChange = startTime;
     int count = countOfRegionServers();
     int oldCount = 0;
+    //如果master没有获取regionserver的注册，一直死循环等待，它里只要有一个regionserver成功注册了就会退出 。
     while (
       !this.master.isStopped() &&
         count < maxToStart &&
