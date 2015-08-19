@@ -226,7 +226,9 @@ public class HRegion implements HeapSize { // , Writable{
   // private int numStores = 0;
   // private int [] storeSize = null;
   // private byte [] name = null;
-
+  /**
+   * 当前region所有store的memstore占用的内存
+   */
   final AtomicLong memstoreSize = new AtomicLong(0);
 
   // Debug possible data loss due to WAL off
@@ -247,6 +249,9 @@ public class HRegion implements HeapSize { // , Writable{
   private final FileSystem fs;
   private final Configuration conf;
   final Configuration baseConf;
+  /**
+   * 等待获取行锁的超时时间，如果超过等待时间，抛出异常,默认30秒
+   */
   private final int rowLockWaitDuration;
   static final int DEFAULT_ROWLOCK_WAIT_DURATION = 30000;
 
@@ -256,16 +261,27 @@ public class HRegion implements HeapSize { // , Writable{
   // we can release the IPC handler soon enough to improve the
   // availability of the region server. It can be adjusted by
   // tuning configuration "hbase.busy.wait.duration".
+  /**
+   * 一个等待更新的获取锁的超时时间，默认是一个RPC超时时间，
+   * 不能比RPC调用超时还长
+   */
   final long busyWaitDuration;
   static final long DEFAULT_BUSY_WAIT_DURATION = HConstants.DEFAULT_HBASE_RPC_TIMEOUT;
 
   // If updating multiple rows in one call, wait longer,
   // i.e. waiting for busyWaitDuration * # of rows. However,
   // we can limit the max multiplier.
+  /**
+   * 获取读写锁的最大超时时间的乘子，超时时间就在busyWaitDuration*maxBusyWaitMultiplier与maxBusyWaitDuration取大值
+   * ，此乘子默认值 为2，这个值会在调用时与实际的行数中取最小值
+   */
   final int maxBusyWaitMultiplier;
 
   // Max busy wait duration. There is no point to wait longer than the RPC
   // purge timeout, when a RPC call will be terminated by the RPC engine.
+  /**
+   * 获取读写锁的最大超时时间，默认RPC超时时间， 不能比RPC调用时间还长
+   */
   final long maxBusyWaitDuration;
 
   private final HRegionInfo regionInfo;
@@ -339,15 +355,29 @@ public class HRegion implements HeapSize { // , Writable{
   }
 
   final WriteState writestate = new WriteState();
-
+  /**
+   * memstore的配置内存大小 ，某个store达到这个值会刷新region
+   */
   long memstoreFlushSize;
   final long timestampSlop;
+  /**
+   * 最一次刷新 region的时间
+   */
   private volatile long lastFlushTime;
   final RegionServerServices rsServices;
   private RegionServerAccounting rsAccounting;
   private List<Pair<Long, Long>> recentFlushes = new ArrayList<Pair<Long,Long>>();
+  /**
+   * 定时刷新region的时间间隔
+   */
   private long flushCheckInterval;
+  /**
+   * 当前region的所有store的内存达到这个值会刷新内存，并且阻止更新，默认为2*memstoreFlushSize
+   */
   private long blockingMemStoreSize;
+  /**
+   * 线程睡眠多少时间后醒来干活
+   */
   final long threadWakeFrequency;
   // Used to guard closes
   final ReentrantReadWriteLock lock =
