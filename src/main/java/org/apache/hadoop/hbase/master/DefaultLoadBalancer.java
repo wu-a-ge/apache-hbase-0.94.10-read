@@ -210,7 +210,7 @@ public class DefaultLoadBalancer implements LoadBalancer {
    *       Should we just keep all assignment in memory?  Any objections?
    *       Does this mean we need HeapSize on HMaster?  Or just careful monitor?
    *       (current thinking is we will hold all assignments in memory)
-   *
+   * see <a href='http://www.linuxidc.com/Linux/2013-07/87233.htm'>举的一个例子</a>
    * @param clusterState Map of regionservers and their load/region information to
    *                   a list of their most loaded regions
    * @return a list of regions to be moved, including source and destination,
@@ -220,7 +220,9 @@ public class DefaultLoadBalancer implements LoadBalancer {
       Map<ServerName, List<HRegionInfo>> clusterState) {
     boolean emptyRegionServerPresent = false;
     long startTime = System.currentTimeMillis();
-
+    /**
+     * rs数量
+     */
     int numServers = clusterState.size();
     if (numServers == 0) {
       LOG.debug("numServers=0 so skipping load balancing");
@@ -228,7 +230,13 @@ public class DefaultLoadBalancer implements LoadBalancer {
     }
     NavigableMap<ServerAndLoad, List<HRegionInfo>> serversByLoad =
       new TreeMap<ServerAndLoad, List<HRegionInfo>>();
+    /**
+     * 所有region数
+     */
     int numRegions = 0;
+    /**
+     * 某个机器上的最在region数
+     */
     int maxRegionCountPerServer = 0;
     // Iterate so we can count regions as we build the map
     for (Map.Entry<ServerName, List<HRegionInfo>> server: clusterState.entrySet()) {
@@ -237,12 +245,18 @@ public class DefaultLoadBalancer implements LoadBalancer {
       if (sz == 0) emptyRegionServerPresent = true;
       numRegions += sz;
       if (maxRegionCountPerServer < sz) maxRegionCountPerServer = sz;
+     
       serversByLoad.put(new ServerAndLoad(server.getKey(), sz), regions);
     }
     // Check if we even need to do any load balancing
+    /**
+     * 计算每个rs上的应该拥有的平均region数量 
+     */
     float average = (float)numRegions / numServers; // for logging
     // HBASE-3681 check sloppiness first
+    //平衡范围的下限
     int floor = (int) Math.floor(average * (1 - slop));
+    //平衡范围的上限
     int ceiling = (int) Math.ceil(average * (1 + slop));
     if (serversByLoad.lastKey().getLoad() <= ceiling &&
        serversByLoad.firstKey().getLoad() >= floor) {
@@ -254,7 +268,13 @@ public class DefaultLoadBalancer implements LoadBalancer {
         " leastloaded=" + serversByLoad.firstKey().getLoad());
       return null;
     }
+    /**
+     * rs最小负载，就是一个平均值取整
+     */
     int min = numRegions / numServers;
+    /**
+     * rs最大负载，最小值或最小值加1
+     */
     int max = numRegions % numServers == 0 ? min : min + 1;
     if (maxRegionCountPerServer == 1) return null; // table is balanced
 
@@ -277,6 +297,7 @@ public class DefaultLoadBalancer implements LoadBalancer {
     boolean fetchFromTail = false;
     Map<ServerName, BalanceInfo> serverBalanceInfo =
       new TreeMap<ServerName, BalanceInfo>();
+    //按region数倒序迭代每一个rs，把它超过max的region取出来,放到regionsToMove
     for (Map.Entry<ServerAndLoad, List<HRegionInfo>> server:
         serversByLoad.descendingMap().entrySet()) {
       ServerAndLoad sal = server.getKey();
@@ -311,14 +332,23 @@ public class DefaultLoadBalancer implements LoadBalancer {
       serverBalanceInfo.put(sal.getServerName(),
         new BalanceInfo(numToOffload, (-1)*numTaken));
     }
+    /**
+     * 需要重新分配的region数
+     */
     int totalNumMoved = regionsToMove.size();
 
     // Walk down least loaded, filling each to the min
     int neededRegions = 0; // number of regions needed to bring all up to min
     fetchFromTail = false;
-
+    /**
+     * 某个rs机器 可以获取的region数
+     */
     Map<ServerName, Integer> underloadedServers = new HashMap<ServerName, Integer>();
+    //最大可以分配的region数
     int maxToTake = numRegions - (int)average;
+    /**
+     * 正序迭代所有的rs，查找所有没有达到 min的rs，填入它需要的region数
+     */
     for (Map.Entry<ServerAndLoad, List<HRegionInfo>> server:
         serversByLoad.entrySet()) {
       if (maxToTake == 0) break; // no more to take
@@ -340,6 +370,8 @@ public class DefaultLoadBalancer implements LoadBalancer {
     List<ServerName> sns =
       Arrays.asList(underloadedServers.keySet().toArray(new ServerName[serversUnderloaded]));
     Collections.shuffle(sns, RANDOM);
+    //TODO:为什么非要从头遍历和尾遍历交叉起来分配region？因为region是按时间排的序，如果不这样，会造成热点？
+    //开始为低于min的rs分配region
     while (regionsToMove.size() > 0) {
       int cnt = 0;
       int i = incr > 0 ? 0 : underloadedServers.size()-1;
@@ -348,7 +380,7 @@ public class DefaultLoadBalancer implements LoadBalancer {
         ServerName si = sns.get(i);
         int numToTake = underloadedServers.get(si);
         if (numToTake == 0) continue;
-
+        //取一个待分配的regonplan放入regionsToReturn
         addRegionPlan(regionsToMove, fetchFromTail, si, regionsToReturn);
         if (emptyRegionServerPresent) {
           fetchFromTail = !fetchFromTail;
@@ -367,6 +399,7 @@ public class DefaultLoadBalancer implements LoadBalancer {
       // iterates underloadedServers in the other direction
       incr = -incr;
     }
+    //是否还有rs没有达到 min负载
     for (Integer i : underloadedServers.values()) {
       // If we still want to take some, increment needed
       neededRegions += i;
@@ -385,7 +418,7 @@ public class DefaultLoadBalancer implements LoadBalancer {
 
     // Need to do a second pass.
     // Either more regions to assign out or servers that are still underloaded
-
+    //如果还有rs没有达到min，继续从max负载中取得region进行待分配列表
     // If we need more to fill min, grab one from each most loaded until enough
     if (neededRegions != 0) {
       // Walk down most loaded, grabbing one from each until we get enough
