@@ -213,7 +213,6 @@ public class HBaseFsck extends Configured implements Tool {
    * This map contains the state of all hbck items.  It maps from encoded region
    * name to HbckInfo structure.  The information contained in HbckInfo is used
    * to detect and correct consistency (hdfs/meta/deployment) problems.
-   * TODO:这个encodeName不是hash么？也能用字典序排序？？
    */
   private TreeMap<String, HbckInfo> regionInfoMap = new TreeMap<String, HbckInfo>();
   private TreeSet<byte[]> disabledTables =
@@ -286,6 +285,7 @@ public class HBaseFsck extends Configured implements Tool {
 
   /**
    * Get deployed regions according to the region servers.
+   * 哪个region部署在哪些(不是哪个的原因是可能有重复部署)regionserver上的信息放入对应的region hbckinfo中
    */
   private void loadDeployedRegions() throws IOException, InterruptedException {
     // From the master, get a list of all known live region servers
@@ -340,6 +340,7 @@ public class HBaseFsck extends Configured implements Tool {
    * This repair method analyzes hbase data in hdfs and repairs it to satisfy
    * the table integrity rules.  HBase doesn't need to be online for this
    * operation to work.
+   * 此方法离线修复 ，不需要和hmaster通信修复 ，hole,orphan,overlaps
    */
   public void offlineHdfsIntegrityRepair() throws IOException, InterruptedException {
     // Initial pass to fix orphans.
@@ -379,6 +380,7 @@ public class HBaseFsck extends Configured implements Tool {
    */
   public int onlineConsistencyRepair() throws IOException, KeeperException,
     InterruptedException {
+	//之前的所有集合和状态全部清空，重新加载
     clearState();
 
     LOG.info("Loading regionsinfo from the .META. table");
@@ -740,6 +742,9 @@ public class HBaseFsck extends Configured implements Tool {
 
   /**
    * Populate hbi's from regionInfos loaded from file system.
+   * 从region目录中读取.regioninfo文件，如果某个region目录
+   * 中不存在.regioninfo文件，那么认为这个region是一个orphan(孤儿).
+   * 从table目录中读取.tableinfo文件，如果没有找到此文件表示当前表是一个orphan
    */
   private SortedMap<String, TableInfo> loadHdfsRegionInfos() throws IOException, InterruptedException {
     tablesInfo.clear(); // regenerating the data
@@ -997,7 +1002,7 @@ public class HBaseFsck extends Configured implements Tool {
   /**
    * Rebuilds meta from information in hdfs/fs.  Depends on configuration
    * settings passed into hbck constructor to point to a particular fs/dir.
-   * 
+   * 专门用了离线修复元数据
    * @param fix flag that determines if method should attempt to fix holes
    * @return true if successful, false if attempt failed.
    */
@@ -1112,7 +1117,7 @@ public class HBaseFsck extends Configured implements Tool {
       LOG.warn("No previous " + regionDir + " exists.  Continuing.");
       return null;
     }
-
+    //隔离目录，默认在hbase.rootdir/.hbck/hbase.rootdir-time目录下
     Path rootDir = getSidelineDir();
     if (parentDir != null) {
       rootDir = new Path(rootDir, parentDir);
@@ -2209,7 +2214,7 @@ public class HBaseFsck extends Configured implements Tool {
       /**
        * Sideline some regions in a big overlap group so that it
        * will have fewer regions, and it is easier to merge them later on.
-       *
+       *将超过最大合并(maxMerge)重叠的region全部隔离起来。貌似这些隔离的region需要人工自己导入???
        * @param bigOverlap the overlapped group with regions more than maxMerge
        * @throws IOException
        */
@@ -2256,7 +2261,7 @@ public class HBaseFsck extends Configured implements Tool {
     }
 
     /**
-     *针对每一个进行region检查
+     * 针对每一个表进行region检查，对disabled的表不检索
      * Check the region chain (from META) of this table.  We are looking for
      * holes, overlaps, and cycles.
      * @return false if there are errors
@@ -2270,7 +2275,8 @@ public class HBaseFsck extends Configured implements Tool {
         return true;
       }
       int originalErrorsCount = errors.getErrorList().size();
-      //理论上每一个rowkey，只应该有一个region，如果有多个就是重叠
+      //理论上每一个rowkey，只应该属于一个region，如果属于多个就是重叠
+      //这里是计算就是为了让覆盖所有的region，看是否有重叠
       Multimap<byte[], HbckInfo> regions = sc.calcCoverage();
       //它只有region的起始与结束rowkey
       SortedSet<byte[]> splits = sc.getSplits();
@@ -2282,6 +2288,7 @@ public class HBaseFsck extends Configured implements Tool {
         Collection<HbckInfo> ranges = regions.get(key);
         if (prevKey == null && !Bytes.equals(key, HConstants.EMPTY_BYTE_ARRAY)) {
           for (HbckInfo rng : ranges) {
+        	 //创建一个新的起始regon
             handler.handleRegionStartKeyNotEmpty(rng);
           }
         }
@@ -2292,6 +2299,7 @@ public class HBaseFsck extends Configured implements Tool {
           byte[] endKey = rng.getEndKey();
           endKey = (endKey.length == 0) ? null : endKey;
           if (Bytes.equals(rng.getStartKey(),endKey)) {
+        	  //这里没有任何处理,只是通知报告
             handler.handleDegenerateRegion(rng);
           }
         }
@@ -2302,6 +2310,7 @@ public class HBaseFsck extends Configured implements Tool {
             LOG.warn("reached end of problem group: " + Bytes.toStringBinary(key));
           }
           problemKey = null; // fell through, no more problem.
+          //一个KEY对应多值，有重叠
         } else if (ranges.size() > 1) {
           // set the new problem key group name, if already have problem key, just
           // keep using it.
@@ -2319,14 +2328,16 @@ public class HBaseFsck extends Configured implements Tool {
             subRange.remove(r1);
             for (HbckInfo r2 : subRange) {
               if (Bytes.compareTo(r1.getStartKey(), r2.getStartKey())==0) {
+            	 //这里没有任何处理,只是通知报告
                 handler.handleDuplicateStartKeys(r1,r2);
               } else {
                 // overlap
+                //这里没有任何处理,只是通知报告
                 handler.handleOverlapInRegionChain(r1, r2);
               }
             }
           }
-
+          //一个KEY没有对应的region，说明是一个hole，有丢失
         } else if (ranges.size() == 0) {
           if (problemKey != null) {
             LOG.warn("reached end of problem group: " + Bytes.toStringBinary(key));
@@ -2337,6 +2348,7 @@ public class HBaseFsck extends Configured implements Tool {
           // if higher key is null we reached the top.
           if (holeStopKey != null) {
             // hole
+        	//创建一个空的region
             handler.handleHoleInRegionChain(key, holeStopKey);
           }
         }
@@ -2346,6 +2358,7 @@ public class HBaseFsck extends Configured implements Tool {
       // When the last region of a table is proper and having an empty end key, 'prevKey'
       // will be null.
       if (prevKey != null) {
+    	  //创建一个新的hregion
         handler.handleRegionEndKeyNotEmpty(prevKey);
       }
       
@@ -2507,6 +2520,7 @@ public class HBaseFsck extends Configured implements Tool {
           regionInfoMap.get(rootLocation.getRegionInfo().getEncodedName());
 
       // If there is no region holding .META.
+      //没有meta region在线上,将root region下线再上线
       if (metaRegions.size() == 0) {
         errors.reportError(ERROR_CODE.NO_META_REGION, ".META. is not found on any region.");
         if (shouldFixAssignments()) {
@@ -2518,6 +2532,7 @@ public class HBaseFsck extends Configured implements Tool {
         }
       }
       // If there are more than one regions pretending to hold the .META.
+      //多个机器持有Meta元数据region，那么让这些机器全部下线root region，再上线
       else if (metaRegions.size() > 1) {
         errors.reportError(ERROR_CODE.MULTI_META_REGION, ".META. is found on more than one region.");
         if (shouldFixAssignments()) {
@@ -2577,6 +2592,7 @@ public class HBaseFsck extends Configured implements Tool {
             sn = pair.getSecond();
           }
           HRegionInfo hri = pair.getFirst();
+          //处理所有表，包括用户表
           if (!(isTableIncluded(hri.getTableNameAsString())
               || hri.isMetaRegion() || hri.isRootRegion())) {
             return true;
@@ -2584,6 +2600,7 @@ public class HBaseFsck extends Configured implements Tool {
           PairOfSameType<HRegionInfo> daughters = MetaReader.getDaughterRegions(result);
           MetaEntry m = new MetaEntry(hri, sn, ts, daughters.getFirst(), daughters.getSecond());
           HbckInfo hbInfo = new HbckInfo(m);
+          //如果是普通表，将在线的meta信息放入了metaentry中,它收集三方信息hdfs,meta,deployed
           HbckInfo previous = regionInfoMap.put(hri.getEncodedName(), hbInfo);
           if (previous != null) {
             throw new IOException("Two entries in META are same " + previous);
@@ -3131,6 +3148,7 @@ public class HBaseFsck extends Configured implements Tool {
           HbckInfo hbi = hbck.getOrCreateInfo(encodedName);
           HdfsEntry he = new HdfsEntry();
           synchronized (hbi) {
+        	  //重复的region目录？？这种情况有点严重
             if (hbi.getHdfsRegionDir() != null) {
               errors.print("Directory " + encodedName + " duplicate??" +
                            hbi.getHdfsRegionDir());
@@ -3146,6 +3164,7 @@ public class HBaseFsck extends Configured implements Tool {
             // This is special case if a region is left after split
             he.hdfsOnlyEdits = true;
             FileStatus[] subDirs = fs.listStatus(regionDir.getPath());
+            //是用hregion目录下如果只有恢复日志目录那么它就是只edits目录，这种region一般无效的region，需要被干掉
             Path ePath = HLog.getRegionDirRecoveredEditsDir(regionDir.getPath());
             for (FileStatus subDir : subDirs) {
               String sdName = subDir.getPath().getName();
@@ -3652,9 +3671,11 @@ public class HBaseFsck extends Configured implements Tool {
     }
 
     // do the real work of hbck
+    //此入口只能在线修复，离线修复需要使用另一个类
     connect();
 
     // if corrupt file mode is on, first fix them since they may be opened later
+    //检查是否有损坏的文件(就是打开了读下，抛异常就表示损坏了)，如果有损坏的文件并且指定了需要隔离，那么在根据目录下创建一个.Corrupt目录放入损坏的文件
     if (checkCorruptHFiles || sidelineCorruptHFiles) {
       LOG.info("Checking all hfiles for corruption");
       HFileCorruptionChecker hfcc = createHFileCorruptionChecker(sidelineCorruptHFiles);
