@@ -1613,7 +1613,7 @@ public class Store extends SchemaConfigured implements HeapSize {
       // calculate the sum of fileSizes[i,i+maxFilesToCompact-1) for algo
       int tooFar = i + this.maxFilesToCompact - 1;
       //最新的文件sumSize[i]等于fileSizes[i]，次新的文件sumSize[i]=fileSizes[i]+sumSize[i+1]
-      //最旧的文件就等于前面的所有新文件的和。越旧的文件fileSizes本身就可能很大，它可能经过多次合并
+      //最旧的文件求和参考值等于前面的所有新文件的和。
       sumSize[i] = fileSizes[i]
           + ((i+1    < countOfFiles) ? sumSize[i+1]      : 0)
           - ((tooFar < countOfFiles) ? fileSizes[tooFar] : 0);
