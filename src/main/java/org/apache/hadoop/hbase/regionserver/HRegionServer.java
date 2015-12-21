@@ -697,16 +697,17 @@ public class HRegionServer implements HRegionInterface, HBaseRPCErrorHandler,
 	  //它内部使用了一个队列
     this.cacheFlusher = new MemStoreFlusher(conf, this);
 
-    // Compaction thread
+    // Compaction thread,所有对storeFile的合并与切换都是通过这个类来实现的
     this.compactSplitThread = new CompactSplitThread(this);
 
     // Background thread to check for compactions; needed if region
     // has not gotten updates in a while. Make it run at a lesser frequency.
     int multiplier = this.conf.getInt(HConstants.THREAD_WAKE_FREQUENCY +
       ".multiplier", 1000);
+    //定时检测某个REGION是否有storeFile需要合并，如果有交给compactSplitThread处理
     this.compactionChecker = new CompactionChecker(this,
       this.threadWakeFrequency * multiplier, this);
-    //定时检测，是否有在线region的需要刷新内存，如果有通知MemStoreFlusher
+    //定时检测是否有在线region的需要刷新内存，如果有通知MemStoreFlusher
     this.periodicFlusher = new PeriodicMemstoreFlusher(this.threadWakeFrequency, this);
 
     // Health checker thread.
@@ -715,12 +716,12 @@ public class HRegionServer implements HRegionInterface, HBaseRPCErrorHandler,
     if (isHealthCheckerConfigured()) {
       healthCheckChore = new HealthCheckChore(sleepTime, this, getConfiguration());
     }
-
+    //锁的租约管理 
     this.leases = new Leases((int) conf.getLong(
         HConstants.HBASE_REGIONSERVER_LEASE_PERIOD_KEY,
         HConstants.DEFAULT_HBASE_REGIONSERVER_LEASE_PERIOD),
         this.threadWakeFrequency);
-
+    //这里可以启动hbase的thrift服务
     // Create the thread for the ThriftServer.
     if (conf.getBoolean("hbase.regionserver.export.thrift", false)) {
       thriftServer = new HRegionThriftServer(this, conf);
@@ -744,6 +745,7 @@ public class HRegionServer implements HRegionInterface, HBaseRPCErrorHandler,
     try {
       // Try and register with the Master; tell it we are here.  Break if
       // server is stopped or the clusterup flag is down or hdfs went wacky.
+      //初始启动的时候，努力尝试注册到master机，除非当前机器stop或集群状态为down，也或hdfs出错才退出.就算master挂了也会等。。。
       while (keepLooping()) {
         MapWritable w = reportForDuty();
         if (w == null) {
@@ -763,6 +765,7 @@ public class HRegionServer implements HRegionInterface, HBaseRPCErrorHandler,
       long lastMsg = 0;
       long oldRequestCount = -1;
       // The main run loop.
+      //主循环（当前主线程）,会定时向master报告当前机器的负载
       while (!this.stopped && isHealthy()) {
         if (!isClusterUp()) {
           if (isOnlineRegionsEmpty()) {

@@ -412,7 +412,7 @@ Server {
        * now wait until it dies to try and become the next active master.  If we
        * do not succeed on our first attempt, this is no longer a cluster startup.
        */
-      //和其它master机器竞争成为active节点，如果成功创建一个临时节点在ZK上，
+      //和其它master机器竞争成为active节点，如果成功创建一个临时master节点在ZK上，
       becomeActiveMaster(startupStatus);
 
       // We are either the active master or we were asked to shutdown
@@ -473,6 +473,9 @@ Server {
     // The ClusterStatusTracker is setup before the other
     // ZKBasedSystemTrackers because it's needed by the activeMasterManager
     // to check if the cluster should be shutdown.
+    //在竞争ctive的时候，这个clusterStatusTracker的shutdown节点是不存在的，只是需要判断集群是否被shutdown了。
+    //如果shutdown状态，那么当前MASTER是需要不需要去竞争成为ACTIVE的，直接退出。
+    //也就是shutdwon节点被删除了，这个节点被删除也是只有客户端主动发起这个请求，其它情况不会发生。
     this.clusterStatusTracker = new ClusterStatusTracker(getZooKeeper(), this);
     this.clusterStatusTracker.start();
     return this.activeMasterManager.blockUntilBecomingActiveMaster(startupStatus,
@@ -504,7 +507,7 @@ Server {
 
     // Set the cluster as up.  If new RSs, they'll be waiting on this before
     // going ahead with their startup.
-    //会在zk的shutdown中写入当前master启动时间
+    //如果不存在shutdown节点，会创建一个永久的shutdown节点。并写入集群的启动日期。
     boolean wasUp = this.clusterStatusTracker.isClusterUp();
     if (!wasUp) this.clusterStatusTracker.setClusterUp();
 
@@ -559,6 +562,7 @@ Server {
     status.setStatus("Initializing Master file system");
     this.masterActiveTime = System.currentTimeMillis();
     // TODO: Do this using Dependency Injection, using PicoContainer, Guice or Spring.
+    //创建hbase,.oldlogs,.tmp目录，创建meta,root表,hbase.id和hbase.version文件等
     this.fileSystemManager = new MasterFileSystem(this, this, metrics, masterRecovery);
 
     this.tableDescriptors =
@@ -566,6 +570,7 @@ Server {
       this.fileSystemManager.getRootDir());
 
     // publish cluster ID
+    //将HDFS中的文件hbase.id值写到ZK的hbaseid节点中
     status.setStatus("Publishing Cluster ID in ZooKeeper");
     ClusterId.setClusterId(this.zooKeeper, fileSystemManager.getClusterId());
     if (!masterRecovery) {
@@ -586,10 +591,11 @@ Server {
       status.setStatus("Initializing master service threads");
       startServiceThreads();
     }
-
+    // hmaste会等待至少hbase.master.wait.on.regionservers.mintostart参数指定的数量的regionserver机器上线才会提供服务，否则一直在这里阻塞
     // Wait for region servers to report in.
     this.serverManager.waitForRegionServers(status);
     // Check zk for regionservers that are up but didn't register
+    //去ZK中rs路径查找还有哪些机器已经上线了但是还没有向master提供报告的情况。比如网络阻塞等引起的
     for (ServerName sn: this.regionServerTracker.getOnlineServers()) {
       if (!this.serverManager.isServerOnline(sn)) {
         // Not registered; add it.
@@ -603,13 +609,14 @@ Server {
     }
 
     // get a list for previously failed RS which need recovery work
+    //对DOWN掉的SERVER，恢复其HLOG
     Set<ServerName> failedServers = this.fileSystemManager.getFailedServersFromLogFolders();
     if (waitingOnLogSplitting) {
       List<ServerName> servers = new ArrayList<ServerName>(failedServers);
       this.fileSystemManager.splitAllLogs(servers);
       failedServers.clear();
     }
-
+    //恢复root表的Hlog
     ServerName preRootServer = this.catalogTracker.getRootLocation();
     if (preRootServer != null && failedServers.contains(preRootServer)) {
       // create recovered edits file for _ROOT_ server
@@ -619,12 +626,14 @@ Server {
 
     this.initializationBeforeMetaAssignment = true;
     // Make sure root assigned before proceeding.
+    //让ROOT表的region上线
     if (!assignRoot(status)) return;
 
     // SSH should enabled for ROOT before META region assignment
     // because META region assignment is depending on ROOT server online.
     this.serverManager.enableSSHForRoot();
-
+    
+    //恢复 meta表的Hlog
     // log splitting for .META. server
     ServerName preMetaServer = this.catalogTracker.getMetaLocationOrReadLocationFromRoot();
     if (preMetaServer != null && failedServers.contains(preMetaServer)) {
@@ -632,7 +641,7 @@ Server {
       this.fileSystemManager.splitAllLogs(preMetaServer);
       failedServers.remove(preMetaServer);
     }
-
+    //让META表上线
     // Make sure meta assigned before proceeding.
     if (!assignMeta(status, ((masterRecovery) ? null : preMetaServer), preRootServer)) return;
 
@@ -652,6 +661,7 @@ Server {
       updateMetaWithNewHRI(this);
 
     // Fixup assignment manager status
+    //TODO:需要好好看看
     status.setStatus("Starting assignment manager");
     this.assignmentManager.joinCluster();
 
@@ -659,6 +669,7 @@ Server {
     this.balancer.setMasterServices(this);
 
     // Fixing up missing daughters if any
+    //修复那些切分后的且离线的父REGION，将其DAUGHTER上线
     status.setStatus("Fixing up missing daughters");
     fixupDaughters(status);
 
@@ -667,6 +678,7 @@ Server {
       // been assigned.
       status.setStatus("Starting balancer and catalog janitor");
       this.balancerChore = getAndStartBalancerChore(this);
+      //定时扫描META表,找到那些产生了split的region进行清理,并让其daughter region上线
       this.catalogJanitorChore = new CatalogJanitor(this, this);
       startCatalogJanitorChore();
       registerMBean();
