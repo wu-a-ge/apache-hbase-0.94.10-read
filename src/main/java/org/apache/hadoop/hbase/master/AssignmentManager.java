@@ -1442,7 +1442,7 @@ public class AssignmentManager extends ZooKeeperListener {
     }
     LOG.debug("Bulk assigning " + regions.size() + " region(s) to " +
       destination.toString());
-
+    //将需要分配的REGION放入regionsInTransition集合中
     List<RegionState> states = new ArrayList<RegionState>(regions.size());
     synchronized (this.regionsInTransition) {
       for (HRegionInfo region: regions) {
@@ -1457,7 +1457,7 @@ public class AssignmentManager extends ZooKeeperListener {
           destination));
     }
     this.addPlans(plans);
-    
+    //在ZK中为每一个REGION创建节点，并且设置回调，在回调的过程中RegionState状态已经变为了PENDING_OPEN
     // Presumption is that only this thread will be updating the state at this
     // time; i.e. handlers on backend won't be trying to set it to OPEN, etc.
     AtomicInteger counter = new AtomicInteger(0);
@@ -1497,6 +1497,7 @@ public class AssignmentManager extends ZooKeeperListener {
           getLong("hbase.regionserver.rpc.startup.waittime", 60000);
       while (!this.master.isStopped()) {
         try {
+        	//此方法成功执行完成后，通过ZK的侦听回调nodeDataChanged，所有的在unassigned下的节点都会被删除
           this.serverManager.sendRegionOpen(destination, regions);
           break;
         } catch (RemoteException e) {
@@ -2381,6 +2382,9 @@ public class AssignmentManager extends ZooKeeperListener {
    * <p>
    * This is a synchronous call and will return once every region has been
    * assigned.  If anything fails, an exception is thrown
+   * <p>
+   * 此方法被assignAllUserRegions调用以及handleCreateTable调用
+   * </p>
    * @throws InterruptedException
    * @throws IOException
    */
