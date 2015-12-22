@@ -1840,7 +1840,9 @@ public class HRegionServer implements HRegionInterface, HBaseRPCErrorHandler,
        sleeper.sleep();
     }
   }
-
+  /**
+   * hregion 打开后需要更新元数据，写入REGION所在的服务器，这样一个过程才算REGION有效的REGION。
+   */
   @Override
   public void postOpenDeployTasks(final HRegion r, final CatalogTracker ct,
       final boolean daughter)
@@ -3027,6 +3029,7 @@ public class HRegionServer implements HRegionInterface, HBaseRPCErrorHandler,
 
       // Mark the region as OPENING up in zk.  This is how we tell the master control of the
       // region has passed to this regionserver.
+      //切换ZK节点状态 OFFLINE-->OPENING
       int version = transitionZookeeperOfflineToOpening(region, versionOfOfflineNode);
       // Need to pass the expected version in the constructor.
       if (region.isRootRegion()) {

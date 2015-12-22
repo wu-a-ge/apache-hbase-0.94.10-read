@@ -1938,6 +1938,7 @@ public class AssignmentManager extends ZooKeeperListener {
     }
     state.update(RegionState.State.OFFLINE);
     try {
+    	//异步在ZK的unassigned下面创建一个节点 ,还有一个回调方法，在创建完成后会回调
       ZKAssign.asyncCreateNodeOffline(master.getZooKeeper(), state.getRegion(),
         this.master.getServerName(), cb, ctx);
     } catch (KeeperException e) {

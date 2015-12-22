@@ -188,6 +188,7 @@ public class CreateTableHandler extends EventHandler {
     
     if (regionInfos != null && regionInfos.size() > 0) {
       // 4. Add regions to META
+    	//先进元数据，再分配
       MetaEditor.addRegionsToMeta(this.catalogTracker, regionInfos);
 
       // 5. Trigger immediate assignment of the regions in round-robin fashion
