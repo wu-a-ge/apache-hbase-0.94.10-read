@@ -159,6 +159,7 @@ public class ZooKeeperWatcher implements Watcher, Abortable {
   private void createBaseZNodes() throws ZooKeeperConnectionException {
     try {
       // Create all the necessary "directories" of znodes
+    	//以下这些节点全都是永久性节点 
       ZKUtil.createAndFailSilent(this, baseZNode);
       ZKUtil.createAndFailSilent(this, assignmentZNode);
       ZKUtil.createAndFailSilent(this, rsZNode);

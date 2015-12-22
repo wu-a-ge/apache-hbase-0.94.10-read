@@ -245,6 +245,7 @@ public class MasterFileSystem {
             sn = sn.substring(0, sn.length() - HLog.SPLITTING_EXT.length());
           }
           ServerName serverName = ServerName.parseServerName(sn);
+          //不在onlineServers中的都认为是死的SERVER
           if (!onlineServers.contains(serverName)) {
             LOG.info("Log folder " + status.getPath() + " doesn't belong "
                 + "to a known region server, splitting");

@@ -151,6 +151,7 @@ public class ActiveMasterManager extends ZooKeeperListener {
 
         // There is another active master running elsewhere or this is a restart
         // and the master ephemeral node has not expired yet.
+        //竞争失败，有两种情况， 一种有其它机器成为了主MASTER，还有一种是当前MASTER以前是主MASTER，但是由于正在重启而ZK节点没有被删除
         this.clusterHasActiveMaster.set(true);
 
         /*
@@ -163,6 +164,7 @@ public class ActiveMasterManager extends ZooKeeperListener {
          */
         LOG.info("Adding ZNode for " + backupZNode +
           " in backup master directory");
+        //竞争失败，当前MASTER放入ZK的BACKUP NODE
         ZKUtil.createEphemeralNodeAndWatch(this.watcher, backupZNode,
           this.sn.getVersionedBytes());
 
@@ -173,6 +175,8 @@ public class ActiveMasterManager extends ZooKeeperListener {
           msg = ("A master was detected, but went down before its address " +
             "could be read.  Attempting to become the next active master");
         } else {
+        	//这就是第二种情况，当前MASTER竞争失败了，发现MASTER节点的主机名是当前主机名，那么这个时候果断把MASTER节点删除掉
+        	//所有机器参与竞争，当前机器也会参与竞争，这是一个大循环。
           ServerName currentMaster = ServerName.parseVersionedServerName(bytes);
           if (ServerName.isSameHostnameAndPort(currentMaster, this.sn)) {
             msg = ("Current master has this master's address, " +

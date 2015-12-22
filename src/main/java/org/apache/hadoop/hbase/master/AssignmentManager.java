@@ -364,6 +364,8 @@ public class AssignmentManager extends ZooKeeperListener {
   /**
    * Called on startup.
    * Figures whether a fresh cluster start of we are joining extant running cluster.
+   * 修正那些在元数据中没有分配的REGION，这些REGION的表肯定处理ENABLING状态，还需要处理Enabling,Disabling状态的表到Enabled,Disabled状态等
+   * ,那些有效的、正常的REGION和SERVER会放入集合中使用
    * @throws IOException
    * @throws KeeperException
    * @throws InterruptedException
@@ -420,7 +422,7 @@ public class AssignmentManager extends ZooKeeperListener {
   throws KeeperException, IOException, InterruptedException {
     List<String> nodes = ZKUtil.listChildrenAndWatchForNewChildren(watcher,
       watcher.assignmentZNode);
-    
+    //如果不存在状态转换中的REGION，那么返回空列表nodes
     if (nodes == null) {
       String errorMessage = "Failed to get the children from ZK";
       master.abort(errorMessage, new IOException(errorMessage));
@@ -430,11 +432,13 @@ public class AssignmentManager extends ZooKeeperListener {
     // its a clean cluster startup, else its a failover.
     synchronized (this.regions) {
       for (Map.Entry<HRegionInfo, ServerName> e : this.regions.entrySet()) {
+    	  //正常启动应该只有元数据表被分配，用户表不可能被分配，所以一量发现用户表被分配就是MASTER发生了切换
         if (!e.getKey().isMetaTable() && e.getValue() != null) {
           LOG.debug("Found " + e + " out on cluster");
           this.failover = true;
           break;
         }
+        //发现有元数据REGION在unssigened节点中，也表示发生了failover，这里不可能是用户表的REGION吧？
         if (nodes.contains(e.getKey().getEncodedName())) {
           LOG.debug("Found " + e.getKey().getRegionNameAsString() + " in RITs");
           // Could be a meta region.
@@ -466,6 +470,7 @@ public class AssignmentManager extends ZooKeeperListener {
       this.failover = false;
       failoverProcessedRegions.clear();
     } else {
+    	//初始化启动，分配所有用户表的REGION
       // Fresh cluster startup.
       LOG.info("Clean cluster startup. Assigning userregions");
       cleanoutUnassigned();
@@ -2407,6 +2412,7 @@ public class AssignmentManager extends ZooKeeperListener {
    * This is a synchronous call and will return once every region has been
    * assigned.  If anything fails, an exception is thrown and the cluster
    * should be shutdown.
+   * 集群初始化启动时，也即没有任何SERVER节点分配用户表的REGION，才有机会调用此方法
    * @throws InterruptedException
    * @throws IOException
    */
@@ -2706,6 +2712,7 @@ public class AssignmentManager extends ZooKeeperListener {
         }
         // Region is being served and on an active server
         // add only if region not in disabled and enabling table
+        //这里将所有所效的REGION和它所在的机器放入集合中
         boolean enabling = checkIfRegionsBelongsToEnabling(regionInfo);
         disabled = checkIfRegionBelongsToDisabled(regionInfo);
         if (!enabling && !disabled) {

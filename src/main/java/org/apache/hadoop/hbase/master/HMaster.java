@@ -357,6 +357,7 @@ Server {
       final ActiveMasterManager amm)
   throws InterruptedException {
     // If we're a backup master, stall until a primary to writes his address
+	  //如果当前MASTER已经确定是BACKUP MASTER那么就一直在这里阻塞直到主MASTER退出，当前MASTER成为主MASTER，否则退出参与竞争主MASTER。
     if (!c.getBoolean(HConstants.MASTER_TYPE_BACKUP,
       HConstants.DEFAULT_MASTER_TYPE_BACKUP)) {
       return;
@@ -389,6 +390,7 @@ Server {
     startupStatus.setDescription("Master startup");
     masterStartTime = System.currentTimeMillis();
     try {
+    	//master 重新注册ZK需要再次注册这些侦听器
       this.registeredZKListenersBeforeRecovery = this.zooKeeper.getListeners();
 
       // Put up info server.
@@ -468,6 +470,7 @@ Server {
     this.activeMasterManager = new ActiveMasterManager(zooKeeper, this.serverName,
         this);
     this.zooKeeper.registerListener(activeMasterManager);
+    //当前是备份节点阻塞，非备份节点退出
     stallIfBackupMaster(this.conf, this.activeMasterManager);
 
     // The ClusterStatusTracker is setup before the other
@@ -604,6 +607,7 @@ Server {
         this.serverManager.recordNewServer(sn, HServerLoad.EMPTY_HSERVERLOAD);
       }
     }
+    //监控region is transition
     if (!masterRecovery) {
       this.assignmentManager.startTimeOutMonitor();
     }
@@ -631,6 +635,7 @@ Server {
 
     // SSH should enabled for ROOT before META region assignment
     // because META region assignment is depending on ROOT server online.
+    //将载有Root表的DEAD SERVER 进行过期处理,是一种防卫保证.不能让多个SERVER持有ROOT表
     this.serverManager.enableSSHForRoot();
     
     //恢复 meta表的Hlog
@@ -644,7 +649,8 @@ Server {
     //让META表上线
     // Make sure meta assigned before proceeding.
     if (!assignMeta(status, ((masterRecovery) ? null : preMetaServer), preRootServer)) return;
-
+    
+    //启动RegionServerShowdown 处理，对那些DOWN掉的服务器进行包括Hgion再分配 ，HLOG切分等
     enableServerShutdownHandler();
 
     // handle other dead servers in SSH
@@ -661,7 +667,6 @@ Server {
       updateMetaWithNewHRI(this);
 
     // Fixup assignment manager status
-    //TODO:需要好好看看
     status.setStatus("Starting assignment manager");
     this.assignmentManager.joinCluster();
 
