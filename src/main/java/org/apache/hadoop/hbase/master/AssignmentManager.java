@@ -213,6 +213,7 @@ public class AssignmentManager extends ZooKeeperListener {
     this.regionsToReopen = Collections.synchronizedMap
                            (new HashMap<String, HRegionInfo> ());
     Configuration conf = master.getConfiguration();
+    //180m分钟才超时是不是时间太长了？
     this.timeoutMonitor = new TimeoutMonitor(
       conf.getInt("hbase.master.assignment.timeoutmonitor.period", 10000),
       master, serverManager,
@@ -1296,6 +1297,9 @@ public class AssignmentManager extends ZooKeeperListener {
    * as part of bulk assign -- there we have a different mechanism for extending
    * the regions in transition timer (we turn it off temporarily -- because
    * there is no regionplan involved when bulk assigning.
+   * <p>当一个机器分配了成千上万的REGION，但是这个机器的处理能力是一次只能处理3个或更少，那么其它的就得排队。
+   * 而在排队的这些RegionState可能会超时，因此需要在MASTER机器中使用一个定时器来更新RegionState时间戳。
+   * </p>
    * @param sn
    */
   private void updateTimers(final ServerName sn) {
@@ -1497,7 +1501,7 @@ public class AssignmentManager extends ZooKeeperListener {
           getLong("hbase.regionserver.rpc.startup.waittime", 60000);
       while (!this.master.isStopped()) {
         try {
-        	//此方法成功执行完成后，通过ZK的侦听回调nodeDataChanged，所有的在unassigned下的节点都会被删除
+        	//在调用此方法的过程中，通过ZK的侦听回调nodeDataChanged来跟踪SERVER端对REGION所做的操作的进度 
           this.serverManager.sendRegionOpen(destination, regions);
           break;
         } catch (RemoteException e) {

@@ -1678,6 +1678,8 @@ public class HRegionServer implements HRegionInterface, HBaseRPCErrorHandler,
   private void startServiceThreads() throws IOException {
     String n = Thread.currentThread().getName();
     // Start executor services
+    //如果REGION很多，表也很多，这些线程数量明显不够用，会造成大是量的RegionState超时
+    //不过当前设置的RegionState超时值为2小时，貌似够了。虽然如此，大量的REGION无法上线，也无法提供正常的服务。
     this.service = new ExecutorService(getServerName().toString());
     this.service.startExecutorService(ExecutorType.RS_OPEN_REGION,
       conf.getInt("hbase.regionserver.executor.openregion.threads", 3));

@@ -607,7 +607,7 @@ Server {
         this.serverManager.recordNewServer(sn, HServerLoad.EMPTY_HSERVERLOAD);
       }
     }
-    //监控region is transition
+    //监控region is transition的RegionState，如果超时了需要重新分配
     if (!masterRecovery) {
       this.assignmentManager.startTimeOutMonitor();
     }
@@ -989,6 +989,7 @@ Server {
   private void startServiceThreads() throws IOException{
 
    // Start the executor service pools
+   //根据表和REGION数量来按需调整这些线程数量。
    this.executorService.startExecutorService(ExecutorType.MASTER_OPEN_REGION,
       conf.getInt("hbase.master.executor.openregion.threads", 5));
    this.executorService.startExecutorService(ExecutorType.MASTER_CLOSE_REGION,
