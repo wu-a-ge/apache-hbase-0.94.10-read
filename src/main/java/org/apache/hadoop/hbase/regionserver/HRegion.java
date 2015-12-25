@@ -250,7 +250,7 @@ public class HRegion implements HeapSize { // , Writable{
   private final Configuration conf;
   final Configuration baseConf;
   /**
-   * 等待获取行锁的超时时间，如果超过等待时间，抛出异常,默认30秒
+   * 等待获取行锁（写一行需要行锁，客户端可以显示获取行锁）的超时时间，如果超过等待时间，抛出异常,默认30秒
    */
   private final int rowLockWaitDuration;
   static final int DEFAULT_ROWLOCK_WAIT_DURATION = 30000;
@@ -262,7 +262,7 @@ public class HRegion implements HeapSize { // , Writable{
   // availability of the region server. It can be adjusted by
   // tuning configuration "hbase.busy.wait.duration".
   /**
-   * 一个等待更新的获取锁的超时时间，默认是一个RPC超时时间，
+   * 获取读写锁的最大超时时间，默认是一个RPC超时时间，
    * 不能比RPC调用超时还长
    */
   final long busyWaitDuration;
@@ -380,10 +380,12 @@ public class HRegion implements HeapSize { // , Writable{
    */
   final long threadWakeFrequency;
   // Used to guard closes
+  //这是一个全局锁，所有的对REGION的操作，CRUD都持有READ锁，当REGION关闭的时候持有写锁。
   final ReentrantReadWriteLock lock =
     new ReentrantReadWriteLock();
 
   // Stop updates lock
+  //此锁是更新数据(READ)与刷新数据(WRITE)之间的一个锁,刷新阻塞更新
   private final ReentrantReadWriteLock updatesLock =
     new ReentrantReadWriteLock();
   private boolean splitRequest;
@@ -2917,7 +2919,9 @@ public class HRegion implements HeapSize { // , Writable{
     lock(this.updatesLock.readLock());
     try {
       checkFamilies(familyMap.keySet());
+      //验证客户端指定的时间戳值是否比服务器的时间戳值更新，一般情况不会发生，服务端的值很大LONG.MAXVALUE
       checkTimestamps(familyMap, now);
+      //如果指定端没有指定时间戳值，就在这里将时间戳值写入了KV里面
       updateKVTimestamps(familyMap.values(), byteNow);
       // write/sync to WAL should happen before we touch memstore.
       //
@@ -3807,6 +3811,7 @@ public class HRegion implements HeapSize { // , Writable{
       }
       // If we are doing a get, we want to be [startRow,endRow] normally
       // it is [startRow,endRow) and if startRow=endRow we get nothing.
+      //起始==结束，返回-1，否则返回0
       this.isScan = scan.isGetScan() ? -1 : 0;
 
       // synchronize on scannerReadPoints so that nobody calculates

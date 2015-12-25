@@ -1409,6 +1409,7 @@ public class HRegionServer implements HRegionInterface, HBaseRPCErrorHandler,
     Path logdir = new Path(rootDir,
       HLog.getHLogDirectoryName(this.serverNameFromMasterPOV.toString()));
     if (LOG.isDebugEnabled()) LOG.debug("logdir=" + logdir);
+    //启动的时候LOG目录存在还不行！！机构DOWN掉，这个目录应该会被干掉
     if (this.fs.exists(logdir)) {
       throw new RegionServerRunningException("Region server has already " +
         "created directory at " + this.serverNameFromMasterPOV.toString());

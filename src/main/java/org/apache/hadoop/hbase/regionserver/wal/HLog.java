@@ -1140,11 +1140,13 @@ public class HLog implements Syncable {
         // Use encoded name.  Its shorter, guaranteed unique and a subset of
         // actual  name.
         byte [] encodedRegionName = info.getEncodedNameAsBytes();
+        //每一个REGION持有一个最旧的序号ID
         this.lastSeqWritten.putIfAbsent(encodedRegionName, seqNum);
         HLogKey logKey = makeKey(encodedRegionName, tableName, seqNum, now, clusterId);
         doWrite(info, logKey, edits, htd);
         this.numEntries.incrementAndGet();
         txid = this.unflushedEntries.incrementAndGet();
+        //表级别的延迟日志刷写，记录其事务ID
         if (htd.isDeferredLogFlush()) {
           lastDeferredTxid = txid;
         }
