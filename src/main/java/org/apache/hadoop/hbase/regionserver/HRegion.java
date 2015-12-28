@@ -659,8 +659,10 @@ public class HRegion implements HeapSize { // , Writable{
         storeOpenerThreadPool.shutdownNow();
       }
     }
+    //这个内存序号也是写入了文件的，所以在打开REGION时需要初始化mvcc
     mvcc.initialize(maxMemstoreTS + 1);
     // Recover any edits if available.
+    //EDIT日志回放写入hfile，得到最大的序号
     maxSeqId = Math.max(maxSeqId, replayRecoveredEditsIfAny(
         this.regiondir, maxSeqIdInStores, reporter, status));
 
@@ -2985,6 +2987,7 @@ public class HRegion implements HeapSize { // , Writable{
 
         Store store = getStore(family);
         for (KeyValue kv: edits) {
+          //把当前的序列号写入每一个KV值
           kv.setMemstoreTS(localizedWriteEntry.getWriteNumber());
           size += store.add(kv);
         }
@@ -3838,8 +3841,11 @@ public class HRegion implements HeapSize { // , Writable{
 
       for (Map.Entry<byte[], NavigableSet<byte[]>> entry :
           scan.getFamilyMap().entrySet()) {
+    	 //取需要扫描的列族
         Store store = stores.get(entry.getKey());
+        //取得列族的扫描器
         KeyValueScanner scanner = store.getScanner(scan, entry.getValue());
+        //再次通过过滤器判断 是否需要扫描此列族
         if (this.filter == null || !scan.doLoadColumnFamiliesOnDemand()
           || FilterBase.isFamilyEssential(this.filter, entry.getKey())) {
           scanners.add(scanner);

@@ -108,6 +108,7 @@ public class MultiVersionConsistencyControl {
   }
 
   public WriteEntry beginMemstoreInsert() {
+	 //加锁，保证有序一致性
     synchronized (writeQueue) {
       long nextWriteNumber = ++memstoreWrite;
       WriteEntry e = new WriteEntry(nextWriteNumber);
@@ -122,6 +123,7 @@ public class MultiVersionConsistencyControl {
   }
 
   boolean advanceMemstore(WriteEntry e) {
+	  //先入队的事务不一定先完成，所以进入这个方法的有可能是后续的后入队的事务
     synchronized (writeQueue) {
       e.markCompleted();
 
@@ -142,14 +144,14 @@ public class MultiVersionConsistencyControl {
           nextReadValue = queueFirst.getWriteNumber();
           writeQueue.removeFirst();
         } else {
-          break;
+          break;//队列的第一个任务没有完成，就退出循环
         }
       }
 
       if (!ranOnce) {
         throw new RuntimeException("never was a first");
       }
-
+      //表明事务完完成了，可以重置读点
       if (nextReadValue > 0) {
         synchronized (readWaiters) {
           memstoreRead = nextReadValue;

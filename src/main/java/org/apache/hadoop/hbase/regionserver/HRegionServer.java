@@ -231,7 +231,9 @@ public class HRegionServer implements HRegionInterface, HBaseRPCErrorHandler,
   private final int msgInterval;
 
   protected final int numRegionsToReport;
-
+  /**
+   * 扫描器一次扫描的结果大小，字节单位，如果达到这个值就直接返回结果，剩下的丢弃了
+   */
   private final long maxScannerResultSize;
 
   // Remote HMaster
