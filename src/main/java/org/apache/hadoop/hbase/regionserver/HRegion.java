@@ -3843,7 +3843,7 @@ public class HRegion implements HeapSize { // , Writable{
           scan.getFamilyMap().entrySet()) {
     	 //取需要扫描的列族
         Store store = stores.get(entry.getKey());
-        //取得列族的扫描器
+        //取得列族的扫描器,StoreScanner，里面又包装了StoreFileScanner,MemstoreScanner
         KeyValueScanner scanner = store.getScanner(scan, entry.getValue());
         //再次通过过滤器判断 是否需要扫描此列族
         if (this.filter == null || !scan.doLoadColumnFamiliesOnDemand()
@@ -4038,16 +4038,20 @@ public class HRegion implements HeapSize { // , Writable{
 
           // Check if rowkey filter wants to exclude this row. If so, loop to next.
           // Techically, if we hit limits before on this row, we don't need this call.
+          //根据当前的KV的行KEY来判断是否需要过滤这一行
           if (filterRowKey(currentRow, offset, length)) {
             results.clear();
+            //跳到下一行
             boolean moreRows = nextRow(currentRow, offset, length);
             if (!moreRows) return false;
             continue;
           }
 
           // Ok, we are good, let's try to get some results from the main heap.
+          //填充了一行的数据到了results
           KeyValue nextKv = populateResult(results, this.storeHeap, limit, currentRow, offset,
               length, metric);
+          //达到了指定的单元格数batch，直接返回
           if (nextKv == KV_LIMIT) {
             if (this.filter != null && filter.hasFilterRow()) {
               throw new IncompatibleFilterException(
@@ -4061,11 +4065,12 @@ public class HRegion implements HeapSize { // , Writable{
           final boolean isEmptyRow = results.isEmpty();
 
           // We have the part of the row necessary for filtering (all of it, usually).
-          // First filter with the filterRow(List).            
+          // First filter with the filterRow(List). 
+          //需要对当前行的各个KV进行处理，hasFilterRow必须要为TRUE
           if (filter != null && filter.hasFilterRow()) {
             filter.filterRow(results);
           }
-
+          //KV结果列表为空或由于之前的调用filterRow()返回TRUE，跳 到下一行
           if (isEmptyRow || filterRow()) {
             results.clear();
             boolean moreRows = nextRow(currentRow, offset, length);
@@ -4131,6 +4136,7 @@ public class HRegion implements HeapSize { // , Writable{
 
     protected boolean nextRow(byte [] currentRow, int offset, short length) throws IOException {
       KeyValue next;
+      //从KVHEAP中去掉这一行的数据
       while((next = this.storeHeap.peek()) != null && next.matchingRow(currentRow, offset, length)) {
         this.storeHeap.next(MOCKED_LIST);       
       }

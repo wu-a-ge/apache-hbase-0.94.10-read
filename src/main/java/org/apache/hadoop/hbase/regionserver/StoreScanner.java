@@ -369,6 +369,7 @@ public class StoreScanner extends NonLazyKeyValueScanner
           case INCLUDE_AND_SEEK_NEXT_COL:
 
             Filter f = matcher.getFilter();
+            //过滤器的transform调用时间
             outResult.add(f == null ? kv : f.transform(kv));
             count++;
 

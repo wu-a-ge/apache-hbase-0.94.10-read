@@ -77,6 +77,7 @@ public class KeyValueHeap extends NonLazyKeyValueScanner
           scanner.close();
         }
       }
+      //先取到第一个KV扫描器
       this.current = pollRealKV();
     }
   }
