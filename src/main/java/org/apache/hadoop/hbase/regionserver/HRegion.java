@@ -380,12 +380,16 @@ public class HRegion implements HeapSize { // , Writable{
    */
   final long threadWakeFrequency;
   // Used to guard closes
-  //这是一个全局锁，所有的对REGION的操作，CRUD都持有READ锁，当REGION关闭的时候持有写锁。
+  /**
+   * 这是一个全局锁，所有的对REGION的操作，CRUD都持有READ锁，当REGION关闭的时候持有写锁。
+   */
   final ReentrantReadWriteLock lock =
     new ReentrantReadWriteLock();
 
   // Stop updates lock
-  //此锁是更新数据(READ)与刷新数据(WRITE)之间的一个锁,刷新阻塞更新
+  /**
+   * 此锁是更新数据(READ)与刷新数据(WRITE)之间的一个锁,刷新阻塞更新
+   */
   private final ReentrantReadWriteLock updatesLock =
     new ReentrantReadWriteLock();
   private boolean splitRequest;
@@ -1673,7 +1677,7 @@ public class HRegion implements HeapSize { // , Writable{
       // Keep running vector of all store files that includes both old and the
       // just-made new flush store file. The new flushed file is still in the
       // tmp directory.
-
+      //TODO:刷新可以考虑使用多线程
       for (StoreFlusher flusher : storeFlushers) {
         flusher.flushCache(status);
       }
