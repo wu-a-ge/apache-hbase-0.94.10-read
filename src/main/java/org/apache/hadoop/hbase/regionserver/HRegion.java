@@ -1677,7 +1677,7 @@ public class HRegion implements HeapSize { // , Writable{
       // Keep running vector of all store files that includes both old and the
       // just-made new flush store file. The new flushed file is still in the
       // tmp directory.
-      //TODO:刷新可以考虑使用多线程
+      //TODO:考虑使用多线程???进一步加快速度
       for (StoreFlusher flusher : storeFlushers) {
         flusher.flushCache(status);
       }

@@ -398,6 +398,7 @@ class MemStoreFlusher extends HasThread implements FlushRequester {
   }
 
   /*
+   * 考虑在这个地方使用线程池？？而不是同步阻塞的方式
    * Flush a region.
    * @param region Region to flush.
    * @param emergencyFlush Set if we are being force flushed. If true the region
