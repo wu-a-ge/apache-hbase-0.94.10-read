@@ -42,6 +42,7 @@ import com.google.common.base.Preconditions;
 
 /**
  * Compact region on request and then run split if appropriate
+ * 切分与合并使用了线程池，线程池大小可配置，默认为1个线程
  */
 public class CompactSplitThread implements CompactionRequestor {
   static final Log LOG = LogFactory.getLog(CompactSplitThread.class);

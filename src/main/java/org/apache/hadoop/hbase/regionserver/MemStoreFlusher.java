@@ -362,6 +362,7 @@ class MemStoreFlusher extends HasThread implements FlushRequester {
     HRegion region = fqe.region;
     if (!fqe.region.getRegionInfo().isMetaRegion() &&
         isTooManyStoreFiles(region)) {
+    	//如果等待时间超过了最大等待刷新时间，那么就算有很多的STOREFILES也强制刷新MEMSTORE
       if (fqe.isMaximumWait(this.blockingWaitTime)) {
         LOG.info("Waited " + (System.currentTimeMillis() - fqe.createTime) +
           "ms on a compaction to clean up 'too many store files'; waited " +
@@ -369,6 +370,7 @@ class MemStoreFlusher extends HasThread implements FlushRequester {
           region.getRegionNameAsString());
       } else {
         // If this is first time we've been put off, then emit a log message.
+    	 //第一次入队，做一次切分检测与合并工作
         if (fqe.getRequeueCount() <= 0) {
           // Note: We don't impose blockingStoreFiles constraint on meta regions
           LOG.warn("Region " + region.getRegionNameAsString() + " has too many " +
@@ -386,6 +388,7 @@ class MemStoreFlusher extends HasThread implements FlushRequester {
 
         // Put back on the queue.  Have it come back out of the queue
         // after a delay of this.blockingWaitTime / 100 ms.
+        //重新入队，等待合并完成 
         this.flushQueue.add(fqe.requeue(this.blockingWaitTime / 100));
         // Tell a lie, it's not flushed but it's ok
         return true;
@@ -573,6 +576,7 @@ class MemStoreFlusher extends HasThread implements FlushRequester {
     /**
      * @return Count of times {@link #resetDelay()} was called; i.e this is
      * number of times we've been requeued.
+     * 表示被入重新入队了多少次
      */
     public int getRequeueCount() {
       return this.requeueCount;
