@@ -1103,6 +1103,7 @@ public class HBaseClient {
     /* we could avoid this allocation for each RPC by having a
      * connectionsId object and with set() method. We need to manage the
      * refs for keys in HashMap properly. For now its ok.
+     *不是每一个RPC调用就创建一个连接对象，这样太消耗资源，而是ConnectionId相同的共享的一个连接
      */
     ConnectionId remoteId = new ConnectionId(addr, protocol, ticket, rpcTimeout);
     synchronized (connections) {
@@ -1112,6 +1113,7 @@ public class HBaseClient {
         connections.put(remoteId, connection);
       }
     }
+    //并发添加调用
     connection.addCall(call);
 
     //we don't invoke the method below inside "synchronized (connections)"
