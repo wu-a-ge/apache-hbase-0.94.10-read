@@ -202,8 +202,13 @@ public abstract class HBaseServer implements RpcServer {
   protected HBaseRpcMetrics  rpcMetrics;
 
   protected Configuration conf;
-
+/**
+ * 服务端所能接收的总请求队列大小默认值：处理线程*10
+ */
   private int maxQueueLength;
+  /**
+   *  服务端所能接收的总请求队列数据大小，默认值是1G
+   */
   private int maxQueueSize;
   protected int socketSendBufferSize;
   protected final boolean tcpNoDelay;   // if T then disable Nagle's Algorithm
@@ -219,8 +224,11 @@ public abstract class HBaseServer implements RpcServer {
   private static final String RESPONSE_QUEUES_MAX_SIZE = "ipc.server.response.queue.maxsize";
 
   volatile protected boolean running = true;         // true while server runs
+
   protected BlockingQueue<Call> callQueue; // queued calls
+
   protected final Counter callQueueSize = new Counter();
+
   protected BlockingQueue<Call> priorityCallQueue;
 
   protected int highPriorityLevel;  // what level a high priority call is at
@@ -483,7 +491,7 @@ public abstract class HBaseServer implements RpcServer {
       port = acceptChannel.socket().getLocalPort(); //Could be an ephemeral port
       // create a selector;
       selector= Selector.open();
-
+      //新开读线程池来处理SOCKET连接，每一个读线程可以处理多个通道
       readers = new Reader[readThreads];
       readPool = Executors.newFixedThreadPool(readThreads,
         new ThreadFactoryBuilder().setNameFormat(
@@ -1514,7 +1522,7 @@ public abstract class HBaseServer implements RpcServer {
     this.bindAddress = bindAddress;
     this.conf = conf;
     this.port = port;
-    this.paramClass = paramClass;
+    this.paramClass = paramClass;//Invocation 客户端的
     this.handlerCount = handlerCount;
     this.priorityHandlerCount = priorityHandlerCount;
     this.socketSendBufferSize = 0;
@@ -1531,7 +1539,6 @@ public abstract class HBaseServer implements RpcServer {
                "please update your configuration");
       this.maxQueueLength = Integer.getInteger(oldMaxQueueSize);
     }
-
     this.maxQueueSize =
       this.conf.getInt("ipc.server.max.callqueue.size",
         DEFAULT_MAX_CALLQUEUE_SIZE);
@@ -1540,10 +1547,16 @@ public abstract class HBaseServer implements RpcServer {
         10);
     this.callQueue  = new LinkedBlockingQueue<Call>(maxQueueLength);
     if (priorityHandlerCount > 0) {
+    	/**
+    	 * 优先级调用队列，在MASTER中没有
+    	 */
       this.priorityCallQueue = new LinkedBlockingQueue<Call>(maxQueueLength); // TODO hack on size
     } else {
       this.priorityCallQueue = null;
     }
+    /**
+     * 队列级别在RegionServer中是10,master中是0
+     */
     this.highPriorityLevel = highPriorityLevel;
     this.maxIdleTime = 2*conf.getInt("ipc.client.connection.maxidletime", 1000);
     this.maxConnectionsToNuke = conf.getInt("ipc.client.kill.max", 10);

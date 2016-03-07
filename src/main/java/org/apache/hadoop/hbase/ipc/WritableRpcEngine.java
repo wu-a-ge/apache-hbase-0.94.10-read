@@ -224,8 +224,13 @@ class WritableRpcEngine implements RpcEngine {
 
     /** Names for suffixed metrics */
     private static final String ABOVE_ONE_SEC_METRIC = ".aboveOneSec.";
-
+    /**
+     * 处理时间大于此值，打印警告信息
+     */
     private final int warnResponseTime;
+    /**
+     * 返回 值的字节数大于此值，打印警告信息
+     */
     private final int warnResponseSize;
 
     private static String classNameBase(String className) {
@@ -268,6 +273,7 @@ class WritableRpcEngine implements RpcEngine {
 
       this.warnResponseTime = conf.getInt(WARN_RESPONSE_TIME,
           DEFAULT_WARN_RESPONSE_TIME);
+
       this.warnResponseSize = conf.getInt(WARN_RESPONSE_SIZE,
           DEFAULT_WARN_RESPONSE_SIZE);
     }

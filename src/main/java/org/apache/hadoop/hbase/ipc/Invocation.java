@@ -30,7 +30,9 @@ import java.io.DataOutput;
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
-
+/**
+ * 客户端的每一次方法调用使用此类序列化和反序列化方法的参数数据
+ */
 /** A method invocation, including the method name and its parameters.*/
 public class Invocation extends VersionedWritable implements Configurable {
   protected String methodName;
