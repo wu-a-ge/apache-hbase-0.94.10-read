@@ -210,7 +210,10 @@ class MemStoreFlusher extends HasThread implements FlushRequester {
     }
     return true;
   }
-
+  /**
+   * 刷新线程是同步的，刷新队列里不管有多少需要刷新的REGION都是一个一个的刷新，这样会严重影响写性能。
+   * 所以在刷新的方式里面可以考虑使用多线程刷新REGION
+   */
   @Override
   public void run() {
     while (!this.server.isStopped()) {
@@ -398,7 +401,7 @@ class MemStoreFlusher extends HasThread implements FlushRequester {
   }
 
   /*
-   * 考虑在这个地方使用线程池？？而不是同步阻塞的方式
+   * TODO:把这个方法里面对HRegion的内存刷新放到线程池里面去做，而不是同步的方式。
    * Flush a region.
    * @param region Region to flush.
    * @param emergencyFlush Set if we are being force flushed. If true the region
@@ -488,6 +491,7 @@ class MemStoreFlusher extends HasThread implements FlushRequester {
           try {
             // we should be able to wait forever, but we've seen a bug where
             // we miss a notify, so put a 5 second bound on it at least.
+        	//TODO:等待时间太长，改成1秒就可以了
             flushOccurred.await(5, TimeUnit.SECONDS);
           } catch (InterruptedException ie) {
             Thread.currentThread().interrupt();
