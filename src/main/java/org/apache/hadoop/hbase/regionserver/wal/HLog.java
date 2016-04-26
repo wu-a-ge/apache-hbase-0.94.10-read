@@ -1301,7 +1301,7 @@ public class HLog implements Syncable {
 
   /**
    * sync all transactions upto the specified txid
-   * TODO：此方法不严谨，BUG算不算？
+   * TODO：此方法不严谨
    * @param txid
    * @throws IOException
    */
@@ -1329,11 +1329,12 @@ public class HLog implements Syncable {
         if (txid <= this.syncedTillHere) {
           return;
         }
-        // 以下两个操作应该是合并成原子操作，在0.98版本中进行了重构和修改，保证了以下两个操作是原子的
+        //以下两个操作应该是合并成原子操作，在0.98版本中进行了重构和修改，保证了以下两个操作是原子的
         //这个值可能已经大于txid了,前面不断的记录更新进来
         doneUpto = this.unflushedEntries.get();
-        //同步取得数据队列，TODO：pending和doneUpto不同步吧？doneUpto可能小于pending里面的序号吧！！！
+        //TODO：pending和doneUpto不同步吧？doneUpto可能小于pending里面的序号吧！！！
         //因为前面正在往队列里面写数据，这里取得了doneUpto不是最新的，但是下面pending却是最新的
+        //会不会引起问题不知道
         pending = logSyncer.getPendingWrites();
         try {
           logSyncer.hlogFlush(tempWriter, pending);
