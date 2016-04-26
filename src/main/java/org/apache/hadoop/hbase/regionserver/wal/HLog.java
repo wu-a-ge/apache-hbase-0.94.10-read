@@ -1131,6 +1131,7 @@ public class HLog implements Syncable {
       }
       long txid = 0;
       synchronized (this.updateLock) {
+    	  //日志序号递增
         long seqNum = obtainSeqNum();
         // The 'lastSeqWritten' map holds the sequence number of the oldest
         // write for each region (i.e. the first edit added to the particular
@@ -1145,6 +1146,8 @@ public class HLog implements Syncable {
         HLogKey logKey = makeKey(encodedRegionName, tableName, seqNum, now, clusterId);
         doWrite(info, logKey, edits, htd);
         this.numEntries.incrementAndGet();
+        //txid 是最低要求同步点，假设瞬间有几百上千的请求进来针不同的表，
+        //lastDeferredTxid保留的是最近的针对那个表的事务ID,但是unflushedEntries的值和seqNum保持一致的
         txid = this.unflushedEntries.incrementAndGet();
         //表级别的延迟日志刷写，记录其事务ID
         if (htd.isDeferredLogFlush()) {
@@ -1255,9 +1258,12 @@ public class HLog implements Syncable {
       }
     }
 
-    // appends new writes to the pendingWrites. It is better to keep it in
-    // our own queue rather than writing it to the HDFS output stream because
-    // HDFSOutputStream.writeChunk is not lightweight at all.
+    /**
+     *  appends new writes to the pendingWrites. It is better to keep it in our own queue rather than writing it to the HDFS output stream because
+ HDFSOutputStream.writeChunk is not lightweight at all.
+     * @param e
+     * @throws IOException
+     */
     synchronized void append(Entry e) throws IOException {
       pendingWrites.add(e);
     }
@@ -1293,7 +1299,12 @@ public class HLog implements Syncable {
     syncer(this.unflushedEntries.get()); // sync all pending items
   }
 
-  // sync all transactions upto the specified txid
+  /**
+   * sync all transactions upto the specified txid
+   * TODO：此方法不严谨，BUG算不算？
+   * @param txid
+   * @throws IOException
+   */
   private void syncer(long txid) throws IOException {
     // if the transaction that we are interested in is already
     // synced, then return immediately.
@@ -1318,7 +1329,11 @@ public class HLog implements Syncable {
         if (txid <= this.syncedTillHere) {
           return;
         }
+        // 以下两个操作应该是合并成原子操作，在0.98版本中进行了重构和修改，保证了以下两个操作是原子的
+        //这个值可能已经大于txid了,前面不断的记录更新进来
         doneUpto = this.unflushedEntries.get();
+        //同步取得数据队列，TODO：pending和doneUpto不同步吧？doneUpto可能小于pending里面的序号吧！！！
+        //因为前面正在往队列里面写数据，这里取得了doneUpto不是最新的，但是下面pending却是最新的
         pending = logSyncer.getPendingWrites();
         try {
           logSyncer.hlogFlush(tempWriter, pending);
@@ -1465,7 +1480,14 @@ public class HLog implements Syncable {
       }
     }
   }
-
+  /**
+   * 把HLogKey，WALEdit封装后使用logSyncer 线程同步写入一个List列表
+   * @param info
+   * @param logKey
+   * @param logEdit
+   * @param htd
+   * @throws IOException
+   */
   protected void doWrite(HRegionInfo info, HLogKey logKey, WALEdit logEdit,
                            HTableDescriptor htd)
   throws IOException {
