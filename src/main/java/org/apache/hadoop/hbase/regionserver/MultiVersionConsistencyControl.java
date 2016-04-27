@@ -144,20 +144,22 @@ public class MultiVersionConsistencyControl {
           nextReadValue = queueFirst.getWriteNumber();
           writeQueue.removeFirst();
         } else {
-          break;//队列的第一个任务没有完成，就退出循环
+         //一直循环到第一个没有完成的任务
+          break;
         }
       }
-
+      //如果队列为空，不可能进来
       if (!ranOnce) {
         throw new RuntimeException("never was a first");
       }
-      //表明事务完完成了，可以重置读点
+      //有新事务完成了，可以重置读点，并且通知等待读写点更新到指定值的另外的写线程
       if (nextReadValue > 0) {
         synchronized (readWaiters) {
           memstoreRead = nextReadValue;
           readWaiters.notifyAll();
         }
       }
+      //有可能进来的是后续的序号的任务，那么读点比当前的序号小
       if (memstoreRead >= e.getWriteNumber()) {
         return true;
       }
@@ -168,6 +170,8 @@ public class MultiVersionConsistencyControl {
   /**
    * Wait for the global readPoint to advance upto
    * the specified transaction number.
+   *当前WriteEntry可能是后入队的事务结果先执行完了，那么读写点比当前的事务小，那么一直等待
+   *如果不等待，那么MVCC读不到这条数据
    */
   public void waitForRead(WriteEntry e) {
     boolean interrupted = false;
