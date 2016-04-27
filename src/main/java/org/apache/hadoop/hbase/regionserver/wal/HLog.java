@@ -507,6 +507,7 @@ public class HLog implements Syncable {
   }
 
   /**
+   * 更新日志序号，保证序号的全局一致性
    * Called by HRegionServer when it opens a new region to ensure that log
    * sequence numbers are always greater than the latest sequence number of the
    * region being brought on-line.
@@ -594,6 +595,7 @@ public class HLog implements Syncable {
       return null;
     }
     byte [][] regionsToFlush = null;
+    //它使用这个锁的原因是，HREGION刷新在结束后会写入一个HKEY，所以会在写日志和滚动日志产生竞争
     this.cacheFlushLock.lock();
     this.logRollRunning = true;
     try {
@@ -1588,6 +1590,7 @@ public class HLog implements Syncable {
    * @see #abortCacheFlush(byte[])
    */
   public long startCacheFlush(final byte[] encodedRegionName) {
+	 //某一个hregion在刷新时获取此锁，另一个hregion就必须等待，所以此锁可以改成读写锁
     this.cacheFlushLock.lock();
     Long seq = this.lastSeqWritten.remove(encodedRegionName);
     // seq is the lsn of the oldest edit associated with this region. If a
@@ -1630,6 +1633,9 @@ public class HLog implements Syncable {
       }
       long txid = 0;
       synchronized (updateLock) {
+    	  //从这里可以看出EDIT日志不是全局一致性按序列号写入的，而是按每个REGION一致性写入的
+    	  //这个KEY的写入就是作个标记，没有任何意义
+    	  //回放时HLOG的每一个KV和STORE的最大序号进行比较，所以它是直接被抛弃
         long now = System.currentTimeMillis();
         WALEdit edit = completeCacheFlushLogEdit();
         HLogKey key = makeKey(encodedRegionName, tableName, logSeqId,

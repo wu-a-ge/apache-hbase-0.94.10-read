@@ -629,7 +629,7 @@ public class HRegion implements HeapSize { // , Writable{
       CompletionService<Store> completionService =
         new ExecutorCompletionService<Store>(storeOpenerThreadPool);
 
-      // initialize each store in parallel
+      // initialize each store in parallel,打开各个STORE已有的storeFile文件
       for (final HColumnDescriptor family : htableDescriptor.getFamilies()) {
         status.setStatus("Instantiating store for column family " + family);
         completionService.submit(new Callable<Store>() {
@@ -639,6 +639,7 @@ public class HRegion implements HeapSize { // , Writable{
         });
       }
       try {
+    	 //从已经加载的 Store中查找到最大maxStoreMemstoreTS和maxSeqId
         for (int i = 0; i < htableDescriptor.getFamilies().size(); i++) {
           Future<Store> future = completionService.take();
           Store store = future.get();
@@ -664,6 +665,7 @@ public class HRegion implements HeapSize { // , Writable{
       }
     }
     //这个内存序号也是写入了文件的，所以在打开REGION时需要初始化mvcc
+    //如果没有StoreFile文件，那么maxMemstoreTS=-1，把以MVCC初始值为0
     mvcc.initialize(maxMemstoreTS + 1);
     // Recover any edits if available.
     //EDIT日志回放写入hfile，得到最大的序号
@@ -3156,6 +3158,7 @@ public class HRegion implements HeapSize { // , Writable{
       }
     }
     long seqid = minSeqIdForTheRegion;
+    //按文件名排序，文件名就是切分时得到的第一次数据更新的序列ID
     NavigableSet<Path> files = HLog.getSplitEditFilesSorted(this.fs, regiondir);
     if (files == null || files.isEmpty()) return seqid;
 
@@ -3169,6 +3172,7 @@ public class HRegion implements HeapSize { // , Writable{
       long maxSeqId = Long.MAX_VALUE;
       String fileName = edits.getName();
       maxSeqId = Math.abs(Long.parseLong(fileName));
+      //此情况说明当前日志文件直接抛弃，没有可回放的数据
       if (maxSeqId <= minSeqIdForTheRegion) {
         String msg = "Maximum sequenceid for this log is " + maxSeqId
             + " and minimum sequenceid for the region is " + minSeqIdForTheRegion
@@ -3210,7 +3214,9 @@ public class HRegion implements HeapSize { // , Writable{
     return seqid;
   }
 
-  /*
+  /**
+   * 回放数据根据各个列族分别写入种自的memstore，到达一定阀值可能需要刷新
+   * 但是最终是肯定会强制刷新内存的
    * @param edits File of recovered edits.
    * @param maxSeqIdInStores Maximum sequenceid found in each store.  Edits in log
    * must be larger than this to be replayed for each store.
@@ -3293,6 +3299,7 @@ public class HRegion implements HeapSize { // , Writable{
           for (KeyValue kv: val.getKeyValues()) {
             // Check this edit is for me. Also, guard against writing the special
             // METACOLUMN info such as HBASE::CACHEFLUSH entries
+        	  //在HLOG写入的特别的一个KV值，直接抛弃
             if (kv.matchingFamily(HLog.METAFAMILY) ||
                 !Bytes.equals(key.getEncodedRegionName(), this.regionInfo.getEncodedNameAsBytes())) {
               skippedEdits++;
