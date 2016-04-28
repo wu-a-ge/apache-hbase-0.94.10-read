@@ -299,6 +299,8 @@ public class StoreFileScanner implements KeyValueScanner {
       // Bloom filter), so we still need to seek.
       realSeekDone = false;
       long maxTimestampInFile = reader.getMaxTimestamp();
+      //如果是传的matcher.getStartedKey()，那么它的时间戳比任何一个文件都大。
+      //都会进入此逻辑
       long seekTimestamp = kv.getTimestamp();
       if (seekTimestamp > maxTimestampInFile) {
         // Create a fake key that is not greater than the real next key.

@@ -571,6 +571,7 @@ public class KeyValue implements Writable, HeapSize {
     byte [] bytes = new byte[KEYVALUE_INFRASTRUCTURE_SIZE + keylength + vlength];
     // Write key, value and key row length.
     int pos = 0;
+    //keylength 本身占4个字节，需要装进去，类似数据的元数据，它的值又指出了key部分占多少字节,vlength同理
     pos = Bytes.putInt(bytes, pos, keylength);
     pos = Bytes.putInt(bytes, pos, vlength);
     pos = Bytes.putShort(bytes, pos, (short)(rlength & 0x0000ffff));
@@ -2159,10 +2160,12 @@ public class KeyValue implements Writable, HeapSize {
       // for specifying the last key/value in a given row, because there is no
       // "lexicographically last column" (it would be infinitely long). The
       // "maximum" key type does not need this behavior.
+      //排序对TYPE进行了特殊处理mininum最小的排在后面
       if (lcolumnlength == 0 && ltype == Type.Minimum.getCode()) {
         // left is "bigger", i.e. it appears later in the sorted order
         return 1;
       }
+      //右侧又排在前面？顺序不一样，效果不同！！
       if (rcolumnlength == 0 && rtype == Type.Minimum.getCode()) {
         return -1;
       }
@@ -2219,6 +2222,7 @@ public class KeyValue implements Writable, HeapSize {
       }
 
       if (!this.ignoreType) {
+    	 //TYPE越大越排在前面
         // Compare types. Let the delete types sort ahead of puts; i.e. types
         // of higher numbers sort before those of lesser numbers. Maximum (255)
         // appears ahead of everything, and minimum (0) appears after
@@ -2243,7 +2247,12 @@ public class KeyValue implements Writable, HeapSize {
       return KeyValue.compareColumns(left, loffset, llength, lfamilylength,
         right, roffset, rlength, rfamilylength);
     }
-
+    /**
+     * 根据时间戳倒序
+     * @param ltimestamp
+     * @param rtimestamp
+     * @return
+     */
     int compareTimestamps(final long ltimestamp, final long rtimestamp) {
       // The below older timestamps sorting ahead of newer timestamps looks
       // wrong but it is intentional. This way, newer timestamps are first

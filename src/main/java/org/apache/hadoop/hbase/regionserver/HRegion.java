@@ -1623,7 +1623,7 @@ public class HRegion implements HeapSize { // , Writable{
     // end up in both snapshot and memstore (makes it difficult to do atomic
     // rows then)
     status.setStatus("Obtaining lock to block concurrent updates");
-    // block waiting for the lock for internal flush
+    // block waiting for the lock for internal flush,创建一个快照，快照完了释放锁，CLIENT又可以继续写
     this.updatesLock.writeLock().lock();
     long flushsize = this.memstoreSize.get();
     status.setStatus("Preparing to flush by snapshotting stores");

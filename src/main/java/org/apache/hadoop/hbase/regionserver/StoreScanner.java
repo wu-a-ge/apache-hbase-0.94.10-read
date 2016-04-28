@@ -122,6 +122,7 @@ public class StoreScanner extends NonLazyKeyValueScanner
     // key does not exist, then to the start of the next matching Row).
     // Always check bloom filter to optimize the top row seek for delete
     // family marker.
+    //对列的一个优化，所有SCANNER定位到起始行，实际上一个假的KV值，它有最大的时间戳 
     if (explicitColumnQuery && lazySeekEnabledGlobally) {
       for (KeyValueScanner scanner : scanners) {
         scanner.requestSeek(matcher.getStartKey(), false, true);
@@ -133,6 +134,8 @@ public class StoreScanner extends NonLazyKeyValueScanner
     }
 
     // Combine all seeked scanners with a heap
+    //添加入堆，row/family/qualifier 相同，时间戳不同，时间戳最大的入堆排在前面
+    //肯定memstore排在最前面
     heap = new KeyValueHeap(scanners, store.comparator);
 
     this.store.addChangedReaderObserver(this);

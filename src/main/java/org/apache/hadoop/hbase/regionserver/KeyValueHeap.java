@@ -194,6 +194,7 @@ public class KeyValueHeap extends NonLazyKeyValueScanner
       } else {
         // Since both the keys are exactly the same, we break the tie in favor
         // of the key which came latest.
+    	  //序号倒序
         long leftSequenceID = left.getSequenceID();
         long rightSequenceID = right.getSequenceID();
         if (leftSequenceID > rightSequenceID) {

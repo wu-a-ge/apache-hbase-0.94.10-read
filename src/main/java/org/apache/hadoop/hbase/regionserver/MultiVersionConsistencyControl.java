@@ -170,7 +170,7 @@ public class MultiVersionConsistencyControl {
   /**
    * Wait for the global readPoint to advance upto
    * the specified transaction number.
-   *当前WriteEntry可能是后入队的事务结果先执行完了，那么读写点比当前的事务小，那么一直等待
+   *当前WriteEntry可能是后入队的事务结果先执行完了，那么读写点比当前的事务小，那么一直等待，
    *如果不等待，那么MVCC读不到这条数据
    */
   public void waitForRead(WriteEntry e) {
