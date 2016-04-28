@@ -842,6 +842,7 @@ public class Store extends SchemaConfigured implements HeapSize {
     // Use a store scanner to find which rows to flush.
     // Note that we need to retain deletes, hence
     // treat this as a minor compaction.
+    //删除数据是被保留的
     InternalScanner scanner = null;
     KeyValueScanner memstoreScanner = new CollectionBackedScanner(set, this.comparator);
     if (getHRegion().getCoprocessorHost() != null) {
@@ -883,7 +884,8 @@ public class Store extends SchemaConfigured implements HeapSize {
               for (KeyValue kv : kvs) {
                 // If we know that this KV is going to be included always, then let us
                 // set its memstoreTS to 0. This will help us save space when writing to disk.
-                if (kv.getMemstoreTS() <= smallestReadPoint) {
+            	  //TODO:这种情况 会发生？当前内存中的KV还有比最小读点更小的是如何来的？
+            	  if (kv.getMemstoreTS() <= smallestReadPoint) {
                   // let us not change the original KV. It could be in the memstore
                   // changing its memstoreTS could affect other threads/scanners.
                   kv = kv.shallowCopy();
@@ -1009,7 +1011,7 @@ public class Store extends SchemaConfigured implements HeapSize {
     return w;
   }
 
-  /*
+  /**
    * Change storefiles adding into place the Reader produced by this new flush.
    * @param sf
    * @param set That was used to make the passed file <code>p</code>.
@@ -1019,6 +1021,7 @@ public class Store extends SchemaConfigured implements HeapSize {
   private boolean updateStorefiles(final StoreFile sf,
                                    final SortedSet<KeyValue> set)
   throws IOException {
+	//阻塞所有更新
     this.lock.writeLock().lock();
     try {
       ArrayList<StoreFile> newList = new ArrayList<StoreFile>(storefiles);
@@ -1797,7 +1800,7 @@ public class Store extends SchemaConfigured implements HeapSize {
     }
   }
 
-  /*
+  /**
    * <p>It works by processing a compaction that's been written to disk.
    *
    * <p>It is usually invoked at the end of a compaction, but might also be

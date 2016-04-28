@@ -1623,7 +1623,8 @@ public class HRegion implements HeapSize { // , Writable{
     // end up in both snapshot and memstore (makes it difficult to do atomic
     // rows then)
     status.setStatus("Obtaining lock to block concurrent updates");
-    // block waiting for the lock for internal flush,创建一个快照，快照完了释放锁，CLIENT又可以继续写
+    // block waiting for the lock for internal flush
+    //创建一个快照，快照完了释放锁，但是内存没有释放，客户端写照样阻塞，有毛用
     this.updatesLock.writeLock().lock();
     long flushsize = this.memstoreSize.get();
     status.setStatus("Preparing to flush by snapshotting stores");
@@ -1679,7 +1680,7 @@ public class HRegion implements HeapSize { // , Writable{
       // Keep running vector of all store files that includes both old and the
       // just-made new flush store file. The new flushed file is still in the
       // tmp directory.
-      //TODO:考虑使用多线程???进一步加快速度
+      //TODO:考虑使用多线程,进一步加快速度
       for (StoreFlusher flusher : storeFlushers) {
         flusher.flushCache(status);
       }
@@ -1693,7 +1694,7 @@ public class HRegion implements HeapSize { // , Writable{
         }
       }
       storeFlushers.clear();
-
+      //TODO:为什么不能刷新一个列族的memstore，减少一部分内存呢？这样客户端阻塞可以继续写！！
       // Set down the memstore size by amount of flush.
       this.addAndGetGlobalMemstoreSize(-flushsize);
     } catch (Throwable t) {

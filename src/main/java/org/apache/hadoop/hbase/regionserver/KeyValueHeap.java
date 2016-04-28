@@ -141,6 +141,7 @@ public class KeyValueHeap extends NonLazyKeyValueScanner
       return false;
     }
     InternalScanner currentAsInternal = (InternalScanner)this.current;
+    //要是StoreScanner在重seek(由于有新的HFIEL加入)，这里不是有阻塞么？
     boolean mayContainMoreRows = currentAsInternal.next(result, limit, metric);
     KeyValue pee = this.current.peek();
     /*
