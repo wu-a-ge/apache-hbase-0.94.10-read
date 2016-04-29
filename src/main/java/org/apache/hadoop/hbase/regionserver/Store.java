@@ -884,7 +884,8 @@ public class Store extends SchemaConfigured implements HeapSize {
               for (KeyValue kv : kvs) {
                 // If we know that this KV is going to be included always, then let us
                 // set its memstoreTS to 0. This will help us save space when writing to disk.
-            	  //TODO:这种情况 会发生？当前内存中的KV还有比最小读点更小的是如何来的？
+            	  //这样理解假如只有写没有读，那么最小读点就是当前的最后一次的写入，所以之前的写入KV都比最后一次的写入小
+            	  //全部设置为0了
             	  if (kv.getMemstoreTS() <= smallestReadPoint) {
                   // let us not change the original KV. It could be in the memstore
                   // changing its memstoreTS could affect other threads/scanners.

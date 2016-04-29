@@ -2994,7 +2994,7 @@ public class HRegion implements HeapSize { // , Writable{
 
         Store store = getStore(family);
         for (KeyValue kv: edits) {
-          //把当前的序列号写入每一个KV值
+          //把当前的内存序号写入每一个KV值
           kv.setMemstoreTS(localizedWriteEntry.getWriteNumber());
           size += store.add(kv);
         }
@@ -5333,10 +5333,12 @@ public class HRegion implements HeapSize { // , Writable{
             get.addColumn(family.getKey(), column.getKey());
           }
           get.setTimeRange(tr.getMin(), tr.getMax());
+          //把指定行的指定列的值读出来
           List<KeyValue> results = get(get, false);
 
           // Iterate the input columns and update existing values if they were
           // found, otherwise add new column initialized to the increment amount
+          //避免了双重循环，使用输入的列数进来迭代，读的列数只能小于等于输入的列数
           int idx = 0;
           for (Map.Entry<byte [], Long> column : family.getValue().entrySet()) {
             long amount = column.getValue();
@@ -5376,6 +5378,7 @@ public class HRegion implements HeapSize { // , Writable{
           // Using default cluster id, as this can only happen in the orginating
           // cluster. A slave cluster receives the final value (not the delta)
           // as a Put.
+          //使用异步，不确保当前任务完成
           txid = this.log.appendNoSync(regionInfo, this.htableDescriptor.getName(),
               walEdits, HConstants.DEFAULT_CLUSTER_ID, EnvironmentEdgeManager.currentTimeMillis(),
               this.htableDescriptor);

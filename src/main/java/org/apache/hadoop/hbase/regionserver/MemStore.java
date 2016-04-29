@@ -482,6 +482,8 @@ public class MemStore implements HeapSize {
                                 long now) {
    this.lock.readLock().lock();
     try {
+      //这里时间的校对，可以理解为由于不同RS机器时间不同步引起的么？需要把写入的KV一定调整到最大
+      //好严谨的逻辑
       KeyValue firstKv = KeyValue.createFirstOnRow(
           row, family, qualifier);
       // Is there a KeyValue in 'snapshot' with the same TS? If so, upgrade the timestamp a bit.
@@ -514,6 +516,7 @@ public class MemStore implements HeapSize {
         }
 
         // if the qualifier matches and it's a put, just RM it out of the kvset.
+        //KV比当前时间还大，只有一种情况 就是之前写入的RS机器比当前写入的机器的时间跑得快
         if (kv.getType() == KeyValue.Type.Put.getCode() &&
             kv.getTimestamp() > now && firstKv.matchingQualifier(kv)) {
           now = kv.getTimestamp();
@@ -552,6 +555,8 @@ public class MemStore implements HeapSize {
     try {
       long size = 0;
       for (KeyValue kv : kvs) {
+    	//memstoreTS设置为0,读操作立即可见，也即如果更新的是一行多个KV，就会出现部分可见。
+    	//没有使用MVCC，是如何考虑的？
         kv.setMemstoreTS(0);
         size += upsert(kv);
       }
@@ -608,6 +613,8 @@ public class MemStore implements HeapSize {
       if (kv.matchingQualifier(cur)) {
 
         // to be extra safe we only remove Puts that have a memstoreTS==0
+    	 //如果之前的值不是使用increment写入的，而是PUT写入的且值不是LONG类型,服务端直接报错;更甚要是写入的是字符串，值可能不正确
+    	 //如果之前的写入不是使用incrment，那么旧的KV是不会被删除的，因为MemstoreTS!=0
         if (kv.getType() == KeyValue.Type.Put.getCode() &&
             kv.getMemstoreTS() == 0) {
           // false means there was a change, so give us the size.
