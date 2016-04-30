@@ -482,8 +482,7 @@ public class MemStore implements HeapSize {
                                 long now) {
    this.lock.readLock().lock();
     try {
-      //这里时间的校对，可以理解为由于不同RS机器时间不同步引起的么？需要把写入的KV一定调整到最大
-      //好严谨的逻辑
+      //内存的KV，同一个机器，如果时间戳不同，只有一种可能就是时间戳是由客户端指定的
       KeyValue firstKv = KeyValue.createFirstOnRow(
           row, family, qualifier);
       // Is there a KeyValue in 'snapshot' with the same TS? If so, upgrade the timestamp a bit.
@@ -516,7 +515,7 @@ public class MemStore implements HeapSize {
         }
 
         // if the qualifier matches and it's a put, just RM it out of the kvset.
-        //KV比当前时间还大，只有一种情况 就是之前写入的RS机器比当前写入的机器的时间跑得快
+        //KV比当前时间还大，只有一种情况，时间戳是由客户端指定的
         if (kv.getType() == KeyValue.Type.Put.getCode() &&
             kv.getTimestamp() > now && firstKv.matchingQualifier(kv)) {
           now = kv.getTimestamp();
@@ -613,8 +612,8 @@ public class MemStore implements HeapSize {
       if (kv.matchingQualifier(cur)) {
 
         // to be extra safe we only remove Puts that have a memstoreTS==0
-    	 //如果之前的值不是使用increment写入的，而是PUT写入的且值不是LONG类型,服务端直接报错;更甚要是写入的是字符串，值可能不正确
-    	 //如果之前的写入不是使用incrment，那么旧的KV是不会被删除的，因为MemstoreTS!=0
+    	 //increment,append,incrementColumnValue,都将memstoreTS设置为0
+    	 //如果之前写入KV不是全盘的以上几个方法，那么它们的memstoreTS不为0，根据就删除不了旧的
         if (kv.getType() == KeyValue.Type.Put.getCode() &&
             kv.getMemstoreTS() == 0) {
           // false means there was a change, so give us the size.
