@@ -3862,6 +3862,7 @@ public class HRegion implements HeapSize { // , Writable{
           || FilterBase.isFamilyEssential(this.filter, entry.getKey())) {
           scanners.add(scanner);
         } else {
+          //过滤器验证多余的列族进入此堆。。。。客户端会传多余的列族进来？什么时候？？？
           joinedScanners.add(scanner);
         }
       }
