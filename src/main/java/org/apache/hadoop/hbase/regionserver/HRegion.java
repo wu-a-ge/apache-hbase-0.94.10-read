@@ -1968,7 +1968,7 @@ public class HRegion implements HeapSize { // , Writable{
         if (kv.isLatestTimestamp() && kv.isDeleteType()) {
           byte[] qual = kv.getQualifier();
           if (qual == null) qual = HConstants.EMPTY_BYTE_ARRAY;
-
+          //客户端可能对某列传递了多个版本
           Integer count = kvCount.get(qual);
           if (count == null) {
             kvCount.put(qual, 1);
@@ -1991,6 +1991,7 @@ public class HRegion implements HeapSize { // , Writable{
           if (result.size() > count) {
             throw new RuntimeException("Unexpected size: " + result.size());
           }
+          //取数据中的最新的那个版本的时间戳给写入的KV
           KeyValue getkv = result.get(count - 1);
           Bytes.putBytes(kv.getBuffer(), kv.getTimestampOffset(),
               getkv.getBuffer(), getkv.getTimestampOffset(), Bytes.SIZEOF_LONG);
