@@ -373,7 +373,7 @@ class MemStoreFlusher extends HasThread implements FlushRequester {
           region.getRegionNameAsString());
       } else {
         // If this is first time we've been put off, then emit a log message.
-    	 //第一次入队，做一次切分检测与合并工作
+    	 //有太多的storefiles,且是第一次入队，做一次切分检测与合并工作
         if (fqe.getRequeueCount() <= 0) {
           // Note: We don't impose blockingStoreFiles constraint on meta regions
           LOG.warn("Region " + region.getRegionNameAsString() + " has too many " +
