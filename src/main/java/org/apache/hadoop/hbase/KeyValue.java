@@ -819,6 +819,7 @@ public class KeyValue implements Writable, HeapSize {
   }
 
   /**
+   * keylength+valuelengh used 8byte,刚好元数据的结束位置,KEY部分的开始位置
    * @return Key offset in backing buffer..
    */
   public int getKeyOffset() {
@@ -856,6 +857,7 @@ public class KeyValue implements Writable, HeapSize {
   }
 
   /**
+   * row length used 2 bytes,row 数据的开始位置，row length 结束位置
    * @return Row offset
    */
   public int getRowOffset() {
@@ -952,6 +954,7 @@ public class KeyValue implements Writable, HeapSize {
   }
 
   /**
+   * 作差得到时间戳的偏移
    * @param keylength Pass if you have it to save on a int creation.
    * @return Timestamp offset
    */

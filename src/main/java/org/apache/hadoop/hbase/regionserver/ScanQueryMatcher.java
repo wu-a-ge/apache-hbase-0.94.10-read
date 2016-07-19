@@ -229,8 +229,10 @@ public class ScanQueryMatcher {
 
     int ret = this.rowComparator.compareRows(row, this.rowOffset, this.rowLength,
         bytes, offset, rowLength);
+    //保存的初始行比当前行小，说明当前行扫描完毕
     if (ret <= -1) {
       return MatchCode.DONE;
+      //这种情况是什么鬼？堆顶的行比下面的大？
     } else if (ret >= 1) {
       // could optimize this, if necessary?
       // Could also be called SEEK_TO_CURRENT_ROW, but this
@@ -241,7 +243,7 @@ public class ScanQueryMatcher {
     // optimize case.
     if (this.stickyNextRow)
         return MatchCode.SEEK_NEXT_ROW;
-
+    //需要扫描的列已经扫描完毕了，进入下一行
     if (this.columns.done()) {
       stickyNextRow = true;
       return MatchCode.SEEK_NEXT_ROW;
@@ -259,6 +261,7 @@ public class ScanQueryMatcher {
 
     long timestamp = kv.getTimestamp();
     // check for early out based on timestamp alone
+    //扫描的时间范围已达到，进入下一行或列
     if (columns.isDone(timestamp)) {
         return columns.getNextRowOrNextColumn(bytes, offset, qualLength);
     }
