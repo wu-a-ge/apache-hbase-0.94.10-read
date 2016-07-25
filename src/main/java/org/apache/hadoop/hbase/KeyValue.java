@@ -2163,12 +2163,12 @@ public class KeyValue implements Writable, HeapSize {
       // for specifying the last key/value in a given row, because there is no
       // "lexicographically last column" (it would be infinitely long). The
       // "maximum" key type does not need this behavior.
-      //排序对TYPE进行了特殊处理mininum最小的排在后面
+      //表示最后一个KEYVALUE的出现在了左侧(KeyValue.createLastOnRow),特殊处理
       if (lcolumnlength == 0 && ltype == Type.Minimum.getCode()) {
         // left is "bigger", i.e. it appears later in the sorted order
         return 1;
       }
-      //右侧又排在前面？顺序不一样，效果不同！！
+      //表示最后一个KEYVALUE的出现在了右侧(KeyValue.createLastOnRow)，返回 -1表示左侧的要比它小,特殊处理
       if (rcolumnlength == 0 && rtype == Type.Minimum.getCode()) {
         return -1;
       }
