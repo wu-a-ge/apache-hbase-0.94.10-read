@@ -1856,6 +1856,7 @@ public class HRegionServer implements HRegionInterface, HBaseRPCErrorHandler,
     LOG.info("Post open deploy tasks for region=" + r.getRegionNameAsString() +
       ", daughter=" + daughter);
     // Do checks to see if we need to compact (references or too many files)
+    //daughter需要引起 compaction
     for (Store s : r.getStores().values()) {
       if (s.hasReferences() || s.needsCompaction()) {
         getCompactionRequester().requestCompaction(r, s, "Opening Region", null);
@@ -1871,6 +1872,7 @@ public class HRegionServer implements HRegionInterface, HBaseRPCErrorHandler,
     } else {
       if (daughter) {
         // If daughter of a split, update whole row, not just location.
+    	// 针对daughter需要添加元数据进META表，而不仅是更新位置信息
         MetaEditor.addDaughter(ct, r.getRegionInfo(),
           this.serverNameFromMasterPOV);
       } else {

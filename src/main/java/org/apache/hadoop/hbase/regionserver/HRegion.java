@@ -606,6 +606,7 @@ public class HRegion implements HeapSize { // , Writable{
 
     // Remove temporary data left over from old regions
     status.setStatus("Cleaning up temporary data from old regions");
+    //每次打开会删除 encoderegionname/.tmp目录 
     cleanupTmpDir();
 
     // Load in all the HStores.
@@ -676,7 +677,9 @@ public class HRegion implements HeapSize { // , Writable{
     // Get rid of any splits or merges that were lost in-progress.  Clean out
     // these directories here on open.  We may be opening a region that was
     // being split but we crashed in the middle of it all.
+    //删除region/.splits目录 
     SplitTransaction.cleanupAnySplitDetritus(this);
+    //region/.merges
     FSUtils.deleteDirectory(this.fs, new Path(regiondir, MERGEDIR));
 
     this.writestate.setReadOnly(this.htableDescriptor.isReadOnly());

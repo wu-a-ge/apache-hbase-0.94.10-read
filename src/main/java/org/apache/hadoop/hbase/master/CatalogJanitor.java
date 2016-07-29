@@ -226,6 +226,7 @@ class CatalogJanitor extends Chore {
       checkDaughterInFs(parent, a_region, HConstants.SPLITA_QUALIFIER);
     Pair<Boolean, Boolean> b =
       checkDaughterInFs(parent, b_region, HConstants.SPLITB_QUALIFIER);
+    //当A和B都没有引用文件 的时候删除父的元数据和归档父HREGION的数据
     if (hasNoReferences(a) && hasNoReferences(b)) {
       LOG.debug("Deleting region " + parent.getRegionNameAsString() +
         " because daughter splits no longer hold references");

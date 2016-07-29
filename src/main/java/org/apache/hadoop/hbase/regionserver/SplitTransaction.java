@@ -617,6 +617,7 @@ public class SplitTransaction {
 
     // Wait for all the tasks to finish
     try {
+    	//这个执行时间很重要，按需要配置
       boolean stillRunning = !threadPool.awaitTermination(
           this.fileSplitTimeout, TimeUnit.MILLISECONDS);
       if (stillRunning) {
@@ -655,6 +656,7 @@ public class SplitTransaction {
     Path storedir = Store.getStoreHomedir(splitdir, encoded, family);
     StoreFile.split(fs, storedir, sf, this.splitrow, Range.bottom);
     encoded = this.hri_b.getEncodedName();
+     //.splitdir/daughter's encodedRegionName/familyName
     storedir = Store.getStoreHomedir(splitdir, encoded, family);
     StoreFile.split(fs, storedir, sf, this.splitrow, Range.top);
   }
@@ -696,6 +698,7 @@ public class SplitTransaction {
   throws IOException {
     // Package private so unit tests have access.
     FileSystem fs = this.parent.getFilesystem();
+    //.splitdir/encoderegionname
     Path regionDir = getSplitDirForDaughter(this.parent.getFilesystem(),
       this.splitdir, hri);
     HRegion r = HRegion.newHRegion(this.parent.getTableDir(),
@@ -706,7 +709,8 @@ public class SplitTransaction {
     r.setOpMetricsReadRequestCount(halfParentReadRequestCount);
     long halfParentWriteRequest = this.parent.getWriteRequestsCount() / 2;
     r.writeRequestsCount.set(halfParentWriteRequest);
-    r.setOpMetricsWriteRequestCount(halfParentWriteRequest);    
+    r.setOpMetricsWriteRequestCount(halfParentWriteRequest); 
+    //.splitdir/encoderegionname ----> tableName/encoderegionname
     HRegion.moveInitialFilesIntoPlace(fs, regionDir, r.getRegionDir());
     return r;
   }
