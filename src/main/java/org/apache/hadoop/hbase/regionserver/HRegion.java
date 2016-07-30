@@ -316,7 +316,7 @@ public class HRegion implements HeapSize { // , Writable{
     }
     return minimumReadPoint;
   }
-  /*
+  /**
    * Data structure of write state flags used coordinating flushes,
    * compactions and closes.
    */
@@ -1358,7 +1358,7 @@ public class HRegion implements HeapSize { // , Writable{
     }
   }
 
-  /*
+  /**
    * Called by compaction thread and after region is opened to compact the
    * HStores if necessary.
    *

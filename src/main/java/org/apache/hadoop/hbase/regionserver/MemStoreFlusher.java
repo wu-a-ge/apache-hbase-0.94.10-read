@@ -353,7 +353,7 @@ class MemStoreFlusher extends HasThread implements FlushRequester {
     }
   }
 
-  /*
+  /**
    * A flushRegion that checks store file count.  If too many, puts the flush
    * on delay queue to retry later.
    * @param fqe
@@ -400,7 +400,7 @@ class MemStoreFlusher extends HasThread implements FlushRequester {
     return flushRegion(region, false);
   }
 
-  /*
+  /**
    * TODO:把这个方法里面对HRegion的内存刷新放到线程池里面去做，而不是同步的方式。
    * Flush a region.
    * @param region Region to flush.
