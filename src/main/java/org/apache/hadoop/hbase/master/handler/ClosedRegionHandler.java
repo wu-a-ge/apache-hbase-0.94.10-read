@@ -102,6 +102,7 @@ public class ClosedRegionHandler extends EventHandler implements TotesHRegionInf
     assignmentManager.setOffline(regionInfo);
     // This below has to do w/ online enable/disable of a table
     assignmentManager.removeClosedRegion(regionInfo);
-    assignmentManager.assign(regionInfo, true);
+    //TODO:关闭REGION后立即重新上线分配！！！但是这个表没有被禁用，但是它又一直上线不能不成功啊！肿么处理，只有永远等待!？
+   assignmentManager.assign(regionInfo, true);
   }
 }

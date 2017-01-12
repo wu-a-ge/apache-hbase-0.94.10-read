@@ -99,14 +99,14 @@ public class OpenRegionHandler extends EventHandler {
       // Open region.  After a successful open, failures in subsequent
       // processing needs to do a close as part of cleanup.
       region = openRegion();
-      //打开失败，转换ZK节点 状态到RS_ZK_REGION_FAILED_OPEN
+      //打开失败，更新节点状态OPENING-->FAILED_OPEN，立即通知了MASTER
       if (region == null) {
         tryTransitionToFailedOpen(regionInfo);
         transitionToFailedOpen = true;
         return;
       }
       boolean failed = true;
-      //更新ZK节点状态OPENING到OPENIN以及更新元数据
+      //更新节点状态OPENING-->OPENIN以及更新元数据，立即通知了MASTER
       if (tickleOpening("post_region_open")) {
         if (updateMeta(region)) {
           failed = false;
@@ -119,7 +119,7 @@ public class OpenRegionHandler extends EventHandler {
         transitionToFailedOpen = true;
         return;
       }
-      //更新节点状态到OPENED
+      //更新节点状态OPENING-->OPENED，立即通知了MASTER
       if (!transitionToOpened(region)) {
         // If we fail to transition to opened, it's because of one of two cases:
         //    (a) we lost our ZK lease
