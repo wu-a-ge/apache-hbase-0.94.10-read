@@ -151,11 +151,21 @@ public class ReplicationZookeeper {
     this.peerClusters = new HashMap<String, ReplicationPeer>();
     ZKUtil.createWithParents(this.zookeeper,
         ZKUtil.joinZNode(this.replicationZNode, this.replicationStateNodeName));
+    //每一个HRegionServer将主机名放入./hbase/replication/rs下
     this.rsServerNameZnode = ZKUtil.joinZNode(rsZNode, server.getServerName().toString());
     ZKUtil.createWithParents(this.zookeeper, this.rsServerNameZnode);
+    //每一个HRegionServer维护了从集群的所有HRegionServer通信
     connectExistingPeers();
   }
-
+ /**
+  * 创建以下永久节点
+  * ./hbase/replication
+  * ./hbase/replication/peers
+  * ./hbase/replication/rs
+  * 监控./hbase/state  节点的数据变化,true或false
+  * @param abortable
+  * @throws KeeperException
+  */
   private void setZNodes(Abortable abortable) throws KeeperException {
     String replicationZNodeName =
         conf.get("zookeeper.znode.replication", "replication");
@@ -179,6 +189,7 @@ public class ReplicationZookeeper {
     this.statusTracker =
         new ReplicationStatusTracker(this.zookeeper, abortable);
     statusTracker.start();
+    //初始时创建 ./hbase/replication/state永久节点
     readReplicationStateZnode();
   }
 
@@ -325,6 +336,7 @@ public class ReplicationZookeeper {
    */
   public ReplicationPeer getPeer(String peerId) throws IOException, KeeperException{
     String znode = ZKUtil.joinZNode(this.peersZNode, peerId);
+    //从 ./hbase/replication/peers/peerid 中获取从集群的ZK配置
     byte [] data = ZKUtil.getData(this.zookeeper, znode);
     String otherClusterKey = Bytes.toString(data);
     if (this.ourClusterKey.equals(otherClusterKey)) {
@@ -342,6 +354,7 @@ public class ReplicationZookeeper {
 
     ReplicationPeer peer = new ReplicationPeer(otherConf, peerId,
         otherClusterKey);
+    //路径  ./hbase/replicaton/peers/peerid/peer-state
     peer.startStateTracker(this.zookeeper, this.getPeerStateNode(peerId));
     return peer;
   }

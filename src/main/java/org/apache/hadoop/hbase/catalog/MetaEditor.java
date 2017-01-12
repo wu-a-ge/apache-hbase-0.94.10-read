@@ -211,6 +211,8 @@ public class MetaEditor {
   public static void offlineParentInMeta(CatalogTracker catalogTracker,
       HRegionInfo parent, final HRegionInfo a, final HRegionInfo b)
   throws NotAllMetaRegionsOnlineException, IOException {
+	//TODO:写个元数据的目是通知HASMTER当前切分的HREGION的情况，HMASTER有个定时器
+	 //CatalogJanitor线程定时处理扫描这些元数据来达到对parent,daughter元数据和数据目录的清理
     HRegionInfo copyOfParent = new HRegionInfo(parent);
     copyOfParent.setOffline(true);
     copyOfParent.setSplit(true);

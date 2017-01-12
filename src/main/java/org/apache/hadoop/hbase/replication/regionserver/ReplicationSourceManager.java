@@ -127,6 +127,7 @@ public class ReplicationSourceManager {
         new OtherRegionServerWatcher(this.zkHelper.getZookeeperWatcher()));
     this.zkHelper.registerRegionServerListener(
         new PeersWatcher(this.zkHelper.getZookeeperWatcher()));
+    // ./hbase/replication/peers及其子节点设置侦听
     this.zkHelper.listPeersIdsAndWatch();
     // It's preferable to failover 1 RS at a time, but with good zk servers
     // more could be processed at the same time.

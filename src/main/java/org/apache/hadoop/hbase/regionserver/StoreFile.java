@@ -268,7 +268,7 @@ public class StoreFile extends SchemaConfigured {
     if (HFileLink.isHFileLink(p)) {
       this.link = new HFileLink(conf, p);
       LOG.debug("Store file " + p + " is a link");
-    } else if (isReference(p)) {
+    } else if (isReference(p)) {//打开切分后的daughter时会到这里
       this.reference = Reference.read(fs, p);
       this.referencePath = getReferredToFile(this.path);
       if (HFileLink.isHFileLink(this.referencePath)) {
@@ -350,11 +350,12 @@ public class StoreFile extends SchemaConfigured {
     return m.matches() && m.groupCount() > 1;
   }
 
-  /*
+  /**
    * Return path to the file referred to by a Reference.  Presumes a directory
    * hierarchy of <code>${hbase.rootdir}/tablename/regionname/familyname</code>.
    * @param p Path to a Reference file.
    * @return Calculated path to parent region file.
+   * hbase/data/namespace/tableName/aaaa/cfA/hfileA
    * @throws IllegalArgumentException when path regex fails to match.
    */
   public static Path getReferredToFile(final Path p) {
@@ -364,15 +365,19 @@ public class StoreFile extends SchemaConfigured {
       throw new IllegalArgumentException("Failed match of store file name " +
           p.toString());
     }
+    //假设子REGION hbase/data/namespace/tableName/bbbb/cfA/hfileA.aaaa
     // Other region name is suffix on the passed Reference file name
+    //parentRegionName
     String otherRegion = m.group(2);
     // Tabledir is up two directories from where Reference was written.
     Path tableDir = p.getParent().getParent().getParent();
+    //hfileA
     String nameStrippedOfSuffix = m.group(1);
     LOG.debug("reference '" + p + "' to region=" + otherRegion + " hfile=" + nameStrippedOfSuffix);
 
     // Build up new path with the referenced region in place of our current
     // region in the reference path.  Also strip regionname suffix from name.
+    //最终得到 hbase/data/namespace/tableName/aaaa/cfA/hfileA
     return new Path(new Path(new Path(tableDir, otherRegion),
       p.getParent().getName()), nameStrippedOfSuffix);
   }
@@ -983,7 +988,9 @@ public class StoreFile extends SchemaConfigured {
     String parentRegionName = f.getPath().getParent().getParent().getName();
     // Write reference with same file id only with the other region name as
     // suffix and into the new region location (under same family).
+    //.splitdir/daughter's encodedRegionName/familyName/hfileName.parentRegionName
     Path p = new Path(splitDir, f.getPath().getName() + "." + parentRegionName);
+    //写入一个Refrence的值入文件 。主要就是切换行KEY和标志是上半部分还是下半部分
     return r.write(fs, p);
   }
 
