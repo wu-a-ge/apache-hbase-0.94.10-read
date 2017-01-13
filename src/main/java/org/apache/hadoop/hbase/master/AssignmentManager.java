@@ -1698,6 +1698,7 @@ public class AssignmentManager extends ZooKeeperListener {
         versionOfOfflineNode = setOfflineInZooKeeper(state, hijack,
             regionAlreadyInTransitionException);
         if(versionOfOfflineNode != -1){
+        	//TODO:下线的表不能上线HRegion
           if (isDisabledorDisablingRegionInRIT(region)) {
             return;
           }
@@ -1727,6 +1728,7 @@ public class AssignmentManager extends ZooKeeperListener {
           && !serverNotRunningYet && forceNewPlan);
       if (plan == null) {
         LOG.debug("Unable to determine a plan to assign " + state);
+        //TODO：无机器可分配HRegion，通知监控重新分配计划片段
         this.timeoutMonitor.setAllRegionServersOffline(true);
         return; // Should get reassigned later when RIT times out.
       }
@@ -1984,7 +1986,7 @@ public class AssignmentManager extends ZooKeeperListener {
     final List<ServerName> servers = this.serverManager.getOnlineServersList();
     final List<ServerName> drainingServers = this.serverManager.getDrainingServersList();
 
-
+    //TODO:排除指定的机器
     if (serverToExclude != null) servers.remove(serverToExclude);
 
     // Loop through the draining server list and remove them from the server
@@ -2022,6 +2024,7 @@ public class AssignmentManager extends ZooKeeperListener {
           || existingPlan.getDestination() == null
           || drainingServers.contains(existingPlan.getDestination())) {
         newPlan = true;
+        //TODO:随机选取一个机器分配这个HRegion产生新的计划片段
         randomPlan = new RegionPlan(state.getRegion(), null, balancer
             .randomAssignment(servers));
         this.regionPlans.put(encodedName, randomPlan);
