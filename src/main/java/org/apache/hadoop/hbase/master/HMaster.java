@@ -357,7 +357,7 @@ Server {
       final ActiveMasterManager amm)
   throws InterruptedException {
     // If we're a backup master, stall until a primary to writes his address
-	  //如果当前MASTER已经确定是BACKUP MASTER那么就一直在这里阻塞直到主MASTER退出，当前MASTER成为主MASTER，否则退出参与竞争主MASTER。
+	  //如果当前MASTER没有明确在配置中指定是BACKUP MASTER，那么就退出参与Active Master的竞争
     if (!c.getBoolean(HConstants.MASTER_TYPE_BACKUP,
       HConstants.DEFAULT_MASTER_TYPE_BACKUP)) {
       return;
@@ -366,6 +366,7 @@ Server {
       "Stalling until master znode is written.");
     // This will only be a minute or so while the cluster starts up,
     // so don't worry about setting watches on the parent znode
+    //当前是一个指定的Backup Master节点，那么一直在这里阻塞，直到有一个Active Master在zookeeper中创建Master节点
     while (!amm.isActiveMaster()) {
       LOG.debug("Waiting for master address ZNode to be written " +
         "(Also watching cluster state node)");
@@ -476,9 +477,7 @@ Server {
     // The ClusterStatusTracker is setup before the other
     // ZKBasedSystemTrackers because it's needed by the activeMasterManager
     // to check if the cluster should be shutdown.
-    //在竞争ctive的时候，这个clusterStatusTracker的shutdown节点是不存在的，只是需要判断集群是否被shutdown了。
-    //如果shutdown状态，那么当前MASTER是需要不需要去竞争成为ACTIVE的，直接退出。
-    //也就是shutdwon节点被删除了，这个节点被删除也是只有客户端主动发起这个请求，其它情况不会发生。
+    //对shutdown节点的侦听，或在成为active master节点后创建shutdown节点并写入启动日期
     this.clusterStatusTracker = new ClusterStatusTracker(getZooKeeper(), this);
     this.clusterStatusTracker.start();
     return this.activeMasterManager.blockUntilBecomingActiveMaster(startupStatus,
@@ -565,7 +564,7 @@ Server {
     status.setStatus("Initializing Master file system");
     this.masterActiveTime = System.currentTimeMillis();
     // TODO: Do this using Dependency Injection, using PicoContainer, Guice or Spring.
-    //创建hbase,.oldlogs,.tmp目录，创建meta,root表,hbase.id和hbase.version文件等
+    //创建（如果没有）hbase,.oldlogs,.tmp目录，创建meta,root表,hbase.id和hbase.version文件等
     this.fileSystemManager = new MasterFileSystem(this, this, metrics, masterRecovery);
 
     this.tableDescriptors =
@@ -607,7 +606,7 @@ Server {
         this.serverManager.recordNewServer(sn, HServerLoad.EMPTY_HSERVERLOAD);
       }
     }
-    //监控region is transition的RegionState，如果超时了需要重新分配
+    //启动TimeoutMonitor线程
     if (!masterRecovery) {
       this.assignmentManager.startTimeOutMonitor();
     }
@@ -615,12 +614,13 @@ Server {
     // get a list for previously failed RS which need recovery work
     //对DOWN掉的SERVER，恢复其HLOG
     Set<ServerName> failedServers = this.fileSystemManager.getFailedServersFromLogFolders();
+    //是否等待日志切分好了再启动HMer
     if (waitingOnLogSplitting) {
       List<ServerName> servers = new ArrayList<ServerName>(failedServers);
       this.fileSystemManager.splitAllLogs(servers);
       failedServers.clear();
     }
-    //恢复root表的Hlog
+    //切分root表的Hlog
     ServerName preRootServer = this.catalogTracker.getRootLocation();
     if (preRootServer != null && failedServers.contains(preRootServer)) {
       // create recovered edits file for _ROOT_ server
@@ -638,7 +638,7 @@ Server {
     //将载有Root表的DEAD SERVER 进行过期处理,是一种防卫保证.不能让多个SERVER持有ROOT表
     this.serverManager.enableSSHForRoot();
     
-    //恢复 meta表的Hlog
+    //切分 meta表的Hlog
     // log splitting for .META. server
     ServerName preMetaServer = this.catalogTracker.getMetaLocationOrReadLocationFromRoot();
     if (preMetaServer != null && failedServers.contains(preMetaServer)) {

@@ -374,7 +374,7 @@ public class ServerManager {
     }
   }
 
-  /*
+  /**
    * Expire the passed server.  Add it to list of deadservers and queue a
    * shutdown processing.
    */

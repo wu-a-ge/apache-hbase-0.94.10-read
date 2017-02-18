@@ -194,6 +194,7 @@ public class ActiveMasterManager extends ZooKeeperListener {
         master.abort("Received an unexpected KeeperException, aborting", ke);
         return false;
       }
+      //一直阻塞，直到收到zookeeper的关于active master被删除的通知!!
       synchronized (this.clusterHasActiveMaster) {
         while (this.clusterHasActiveMaster.get() && !this.master.isStopped()) {
           try {
